@@ -8,3 +8,8 @@ license = "MIT"
 
 [dependencies]
 clap = "2.33.3"
+serde = "1.0.130"
+serde_json = "1.0.68"
+indicatif = "0.16.2"
+dialoguer = "0.9.0"
+console = "0.15.0"
