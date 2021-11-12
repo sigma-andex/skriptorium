@@ -1,4 +1,4 @@
-module NLPCloud (Client, Token(..), Query(..), makeClient, generation) where
+module NLPCloud (Client, Query(..), makeClient, generation) where
 
 import Prelude
 
@@ -15,12 +15,9 @@ import Justifill.Fillable (class FillableFields)
 import Justifill.Justifiable (class JustifiableFields)
 import Prim.Row (class Union)
 import Prim.RowList (class RowToList)
+import Types (Token(..))
 
 foreign import data Client :: Type
-
-newtype Token = Token String
-
-instance Newtype Token String
 
 newtype Query = Query String
 
