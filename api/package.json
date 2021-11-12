@@ -1,0 +1,25 @@
+{
+  "name": "skriptorium-api",
+  "version": "1.0.0",
+  "description": "Http api for skriptorium",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sigma-andex/skriptorium.git"
+  },
+  "author": "Jan Schulte",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sigma-andex/skriptorium/issues"
+  },
+  "homepage": "https://github.com/sigma-andex/skriptorium#readme",
+  "devDependencies": {
+    "purescript": "^0.14.5",
+    "purescript-psa": "^0.8.2",
+    "purs-tidy": "^0.6.2",
+    "spago": "^0.20.3"
+  }
+}
