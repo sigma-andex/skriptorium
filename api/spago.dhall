@@ -2,6 +2,7 @@
 , dependencies =
   [ "aff"
   , "aff-promise"
+  , "arrays"
   , "console"
   , "effect"
   , "heterogeneous-extrablatt"
