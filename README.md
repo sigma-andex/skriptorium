@@ -1,3 +1,3 @@
-# skriptorium
+# skriptorium 🖋
 
 WIP
