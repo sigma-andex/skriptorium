@@ -9,6 +9,7 @@
   , "httpure"
   , "justifill"
   , "maybe"
+  , "newtype"
   , "node-process"
   , "nullable"
   , "posix-types"
