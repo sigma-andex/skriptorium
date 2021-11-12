@@ -4,6 +4,8 @@
   "description": "Http api for skriptorium",
   "main": "index.js",
   "scripts": {
+    "setup": "npm install && npx spago install",
+    "bundle": "npx spago bundle-app --to target/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
