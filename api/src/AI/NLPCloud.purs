@@ -1,4 +1,4 @@
-module NLPCloud (Client, Query(..), makeClient, generation) where
+module AI.NLPCloud (Client, Query(..), makeClient, generation) where
 
 import Prelude
 
@@ -22,6 +22,8 @@ foreign import data Client :: Type
 newtype Query = Query String
 
 instance Newtype Query String
+derive newtype instance Show Query
+derive newtype instance Eq Query
 
 foreign import makeClientImpl :: String -> Effect Client
 
@@ -36,27 +38,38 @@ type Generation
   { generated_text :: String
   }
 
-type InternalGenerationProps
+type GenerationPropsR :: forall k. (Type -> k) -> Row k
+type GenerationPropsR f
   =
-  { minLength :: Nullable Int
-  , maxLength :: Nullable Int
-  , endSequence :: Nullable String
-  }
-
-type GenerationProps
-  =
-  ( minLength :: Maybe Int
-  , maxLength :: Maybe Int
-  , endSequence :: Maybe String
+  ( minLength :: f Int
+  , maxLength :: f Int
+  , lengthNoInput :: f Boolean
+  , endSequence :: f String
+  , removeInput :: f Boolean
+  , doSample :: f Boolean
+  , numBeams :: f Int
+  , earlyStopping :: f Boolean
+  , noRepeatNgramSize :: f Int
+  , numReturnSequences :: f Int
+  , topK :: f Number
+  , topP :: f Number
+  , temperature :: f Number
+  , repetitionPenalty :: f Number
+  , lengthPenalty :: f Number
+  , badWords :: f String
   )
 
-foreign import generationImpl :: Client -> InternalGenerationProps -> String -> (Effect (Promise (Response Generation)))
+type GenerationProps f
+  =
+  { | GenerationPropsR f }
+
+foreign import generationImpl :: Client -> GenerationProps Nullable -> String -> (Effect (Promise (Response Generation)))
 
 generation
   :: forall from fromRL via missing missingList
    . RowToList missing missingList
   => FillableFields missingList () missing
-  => Union via missing GenerationProps
+  => Union via missing (GenerationPropsR Maybe)
   => RowToList from fromRL
   => JustifiableFields fromRL from () via
   => Client
@@ -65,8 +78,8 @@ generation
   -> Aff (Response Generation)
 generation client props (Query input) = generationImpl client (toInternalGenerationProps props) input # Promise.toAffE
   where
-  toGenerationProps :: { | from } -> { | GenerationProps }
+  toGenerationProps :: { | from } -> GenerationProps Maybe
   toGenerationProps = justifill
 
-  toInternalGenerationProps :: { | from } -> InternalGenerationProps
+  toInternalGenerationProps :: { | from } -> GenerationProps Nullable
   toInternalGenerationProps = toGenerationProps >>> hmapKRec toNullable

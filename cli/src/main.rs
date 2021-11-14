@@ -1,12 +1,31 @@
 extern crate clap;
 
-use clap::{App, SubCommand};
+mod api;
 
-fn scribe(matches: &clap::ArgMatches) {
+use clap::{App, SubCommand};
+use std::io::Error;
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
     println!("scribing now...");
+    let snippet = 
+"```
+from cryptography.fernet import Fernet
+key = Fernet.generate_key()
+f = Fernet(key)
+token = f.encrypt(b\"A really secret message. Not for prying eyes.\")
+```";
+    let result = api::api::classify(snippet.to_owned()).await;
+    match result {
+        Ok(res) => println!("Got result {:?}", res),
+        Err(err) => println!("Got err {:?}", err),
+    }
+    Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
     let matches = App::new("skriptorium")
         .version("1.0")
         .about("...soon there will be more information here...")
@@ -18,6 +37,8 @@ fn main() {
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("scribe") {
-        scribe(matches);
+        let result = scribe(matches).await;
     }
+
+    Ok(())
 }

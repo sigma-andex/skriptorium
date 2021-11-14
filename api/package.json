@@ -4,6 +4,7 @@
   "description": "Http api for skriptorium",
   "main": "index.js",
   "scripts": {
+    "dev": "spago build --watch & nodemon \"node index.js\"",
     "setup": "npm install && npx spago install",
     "bundle": "npx spago bundle-app --to target/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -23,5 +24,8 @@
     "purescript-psa": "^0.8.2",
     "purs-tidy": "^0.6.2",
     "spago": "^0.20.3"
+  },
+  "dependencies": {
+    "nlpcloud": "^1.0.13"
   }
 }
