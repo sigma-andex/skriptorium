@@ -6,6 +6,7 @@ use console::style;
 use console::Emoji;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+use std::fmt;
 use std::time::Duration;
 use tokio;
 use tokio::fs::File;
@@ -32,11 +33,6 @@ pub async fn read_utf8_file(file_name: String) -> Result<String> {
     Ok(utf8_file)
 }
 
-enum ClassificationStatus {
-    Done,
-    Failed,
-}
-
 pub async fn classification_task<'a>(snippet: String) -> Result<classification::Classification> {
     let (tx, mut rx) = mpsc::channel(32);
 
@@ -51,11 +47,14 @@ pub async fn classification_task<'a>(snippet: String) -> Result<classification::
         let classification_result = classification::classify(snippet.to_owned()).await;
         match classification_result {
             Ok(classification) => {
-                tx.send(ClassificationStatus::Done).await;
+                tx.send(Ok(classification.clone())).await?;
                 Ok(classification)
             }
             Err(err) => {
-                tx.send(ClassificationStatus::Done).await;
+                tx.send(Err(
+                    classification::ClassificationError::ClassificationFailed,
+                ))
+                .await?;
                 Err(err)
             }
         }
@@ -65,11 +64,12 @@ pub async fn classification_task<'a>(snippet: String) -> Result<classification::
         loop {
             if let Ok(result) = rx.try_recv() {
                 let msg = match result {
-                    ClassificationStatus::Done => {
+                    Ok(_) => {
                         format!(
-                            " {} {}",
+                            " {} {} {}",
                             CLASSIFIED,
-                            style("Classification successful").dim().white()
+                            style("Classification successful: ").dim().white(),
+                            style("Classification successful: ").dim().blue(),
                         )
                     }
                     _ => format!(
@@ -90,7 +90,7 @@ pub async fn classification_task<'a>(snippet: String) -> Result<classification::
             std::thread::sleep(Duration::from_millis(10));
         }
 
-        yield_now().await;
+        yield_now().await
     });
 
     let (first, _) = tokio::try_join!(classification_handle, result_handle)?;

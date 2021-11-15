@@ -4,6 +4,22 @@ use crate::types::Result;
 use base64::encode;
 use log::info;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+#[derive(Debug)]
+pub enum ClassificationError {
+    ClassificationFailed,
+}
+
+impl std::error::Error for ClassificationError {}
+
+impl fmt::Display for ClassificationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ClassificationError::ClassificationFailed => write!(f, "Classification failed."),
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ClassificationRequest {
