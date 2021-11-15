@@ -3,6 +3,7 @@ pub mod api {
 
     use base64::{decode, encode};
     use serde::{Deserialize, Serialize};
+    use log::{info, trace, warn};
 
     #[derive(Serialize, Deserialize, Debug)]
     struct ClassificationRequest {
@@ -11,7 +12,7 @@ pub mod api {
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Classification {
-        classification: String,
+        pub classification: String,
     }
 
     pub async fn classify(
@@ -22,7 +23,7 @@ pub mod api {
             snippet: encode(snippet),
         };
         let request = serde_json::to_string(&request)?;
-        println!("Sending request {:?}", request);
+        info!("Sending request {}", request);
         let response = client
             .post("http://localhost:8080/api/v1/classification")
             .body(request)
