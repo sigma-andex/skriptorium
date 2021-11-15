@@ -9,4 +9,4 @@ import Node.FS.Aff (readTextFile)
 import Node.Path (FilePath)
 
 qaTemplate :: FilePath -> String -> Aff String
-qaTemplate fp snippet = readTextFile UTF8 fp <#> \template -> trim template <> "\nQ: " <> trim snippet <> "\nA: "
+qaTemplate fp snippet = readTextFile UTF8 fp <#> \template -> trim template <> "\nQ: \n" <> trim snippet <> "\nA: "

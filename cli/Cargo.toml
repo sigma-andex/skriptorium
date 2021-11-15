@@ -14,7 +14,6 @@ crossbeam-channel = "0.4.0"
 dialoguer = "0.9.0"
 indicatif = "0.16.2"
 log = "0.4"
-markdown-gen = "1.2.1"
 notify = "5.0.0-pre.13"
 reqwest = {version = "0.11", features = ["json"]}
 serde = {version = "1.0.130", features = ["derive"]}

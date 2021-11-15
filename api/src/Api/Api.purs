@@ -10,12 +10,13 @@ import Data.String (trim)
 import Data.String.Base64 as B64
 import Effect (Effect)
 import Effect.Aff (Aff, error, throwError)
+import Effect.Class.Console (log)
 import Environment (AppEnvironment)
 
 classification :: NLPCloud.Client -> ClassificationRequest -> Aff ClassificationResponse
 classification client { snippet } = do
   b64Decoded <- either (const $ throwError $ error "Not valid base64") pure $ B64.atob snippet
-  templatedQuery <- Templates.qaTemplate "templates/classification.txt" b64Decoded <#> NLPCloud.Query
+  templatedQuery <- Templates.qaTemplate "templates/classification.txt" b64Decoded
   let
     settings =
       { minLength: 10
@@ -31,7 +32,9 @@ classification client { snippet } = do
       , repetitionPenalty: 1.0
       , lengthPenalty: 1.0
       }
-  { "data": { generated_text } } <- NLPCloud.generation client settings templatedQuery
+  log $ "Sending query:\n" <> templatedQuery
+  { "data": { generated_text } } <- NLPCloud.generation client settings $ NLPCloud.Query templatedQuery
+  log $ "Received result:\n" <> generated_text
   pure { classification: trim generated_text }
 
 type Handlers =
