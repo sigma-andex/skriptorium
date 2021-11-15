@@ -1,6 +1,7 @@
 extern crate clap;
 
 use crate::api::classification;
+use crate::types::Result;
 use console::style;
 use console::Emoji;
 use indicatif::MultiProgress;
@@ -8,6 +9,8 @@ use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use std::time::Duration;
 use tokio;
+use tokio::fs::File;
+use tokio::io::{self, AsyncReadExt};
 use tokio::sync::mpsc;
 use tokio::task::yield_now;
 
@@ -21,17 +24,19 @@ static PEN: Emoji<'_, '_> = Emoji("🖋 ", "=>");
 static CROSS_MARK: Emoji<'_, '_> = Emoji("❌ ", "X");
 static CLASSIFIED: Emoji<'_, '_> = Emoji("🗄️ ", "!");
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
+pub async fn read_utf8_file(file_name: String) -> Result<String> {
+    let mut file = File::open("snippet.txt").await?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).await?;
+
+    let utf8_file = String::from_utf8(buffer)?;
+    Ok(utf8_file)
+}
 
 pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
     println!("{} {}", PEN, style("Scribing now...").bold().white());
 
-    let snippet = "```
-from cryptography.fernet import Fernet
-key = Fernet.generate_key()
-f = Fernet(key)
-token = f.encrypt(b\"A really secret message. Not for prying eyes.\")
-```";
+    let snippet = read_utf8_file("snippet.txt".to_owned()).await?;
 
     let (tx, mut rx) = mpsc::channel(32);
 
