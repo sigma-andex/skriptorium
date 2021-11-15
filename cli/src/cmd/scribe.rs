@@ -4,13 +4,12 @@ use crate::api::classification;
 use crate::types::Result;
 use console::style;
 use console::Emoji;
-use indicatif::MultiProgress;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use std::time::Duration;
 use tokio;
 use tokio::fs::File;
-use tokio::io::{self, AsyncReadExt};
+use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc;
 use tokio::task::yield_now;
 
@@ -25,7 +24,7 @@ static CROSS_MARK: Emoji<'_, '_> = Emoji("❌ ", "X");
 static CLASSIFIED: Emoji<'_, '_> = Emoji("🗄️ ", "!");
 
 pub async fn read_utf8_file(file_name: String) -> Result<String> {
-    let mut file = File::open("snippet.txt").await?;
+    let mut file = File::open(file_name).await?;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).await?;
 
@@ -33,17 +32,16 @@ pub async fn read_utf8_file(file_name: String) -> Result<String> {
     Ok(utf8_file)
 }
 
-pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
-    println!("{} {}", PEN, style("Scribing now...").bold().white());
+enum ClassificationStatus {
+    Done,
+    Failed,
+}
 
-    let snippet = read_utf8_file("snippet.txt".to_owned()).await?;
-
+pub async fn classification_task<'a>(snippet: String) -> Result<classification::Classification> {
     let (tx, mut rx) = mpsc::channel(32);
 
-    let multi_progress = MultiProgress::new();
-
     let count = 30 * 100;
-    let pb = multi_progress.add(ProgressBar::new(count));
+    let pb = ProgressBar::new(count);
     let progressbar_style = ProgressStyle::default_spinner()
         .tick_chars(TICK_SETTINGS.0)
         .template(" {spinner:.blue} {msg:<30} ");
@@ -51,20 +49,27 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
 
     let classification_handle = tokio::spawn(async move {
         let classification_result = classification::classify(snippet.to_owned()).await;
-        tx.send(classification_result).await
+        match classification_result {
+            Ok(classification) => {
+                tx.send(ClassificationStatus::Done).await;
+                Ok(classification)
+            }
+            Err(err) => {
+                tx.send(ClassificationStatus::Done).await;
+                Err(err)
+            }
+        }
     });
+
     let result_handle = tokio::spawn(async move {
         loop {
             if let Ok(result) = rx.try_recv() {
                 let msg = match result {
-                    Ok(classification::Classification { classification })
-                        if !String::is_empty(&classification) =>
-                    {
+                    ClassificationStatus::Done => {
                         format!(
-                            " {} {} {}",
+                            " {} {}",
                             CLASSIFIED,
-                            style("Classfication sucessful:").dim().white(),
-                            style(classification).bold().white()
+                            style("Classification successful").dim().white()
                         )
                     }
                     _ => format!(
@@ -88,16 +93,15 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         yield_now().await;
     });
 
-    multi_progress.join();
-    let result = tokio::try_join!(classification_handle, result_handle);
+    let (first, _) = tokio::try_join!(classification_handle, result_handle)?;
+    first
+}
 
-    match result {
-        Ok((first, second)) => {
-            println!("Got result {:?}", first);
-        }
-        Err(err) => {
-            println!("processing failed; error = {}", err);
-        }
-    }
+pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
+    println!("{} {}", PEN, style("Scribing now...").bold().white());
+
+    let snippet = read_utf8_file("snippet.txt".to_owned()).await?;
+    let result = classification_task(snippet).await?;
+
     Ok(())
 }
