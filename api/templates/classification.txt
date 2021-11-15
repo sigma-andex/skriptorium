@@ -1,11 +1,3 @@
-module Api.Templates.Classification where
-
-import Prelude
-
-import Data.String (trim)
-
-classificationTemplate :: String -> String
-classificationTemplate snippet = """
 Q: 
 ```
 from flask import Flask
@@ -36,4 +28,3 @@ model.add(Dense(units=10, activation='softmax'))
 ```
 A: machine-learning
 ###
-Q: """ <> trim snippet <> "\nA: "
