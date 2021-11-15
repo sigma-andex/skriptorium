@@ -1,8 +1,9 @@
-module Api.Api (Handlers, mkHandlers) where
+module Api.Api (Handlers, mkHandlers, mkMockHandlers) where
 
 import Prelude
 
 import AI.NLPCloud as NLPCloud
+import Api.Templates as Templates
 import Api.Types (ClassificationRequest, ClassificationResponse)
 import Data.Either (either)
 import Data.String (trim)
@@ -10,7 +11,6 @@ import Data.String.Base64 as B64
 import Effect (Effect)
 import Effect.Aff (Aff, error, throwError)
 import Environment (AppEnvironment)
-import Api.Templates as Templates
 
 classification :: NLPCloud.Client -> ClassificationRequest -> Aff ClassificationResponse
 classification client { snippet } = do
@@ -44,3 +44,6 @@ mkHandlers { token } = do
   pure
     { classification: classification client
     }
+
+mkMockHandlers :: AppEnvironment -> Effect Handlers
+mkMockHandlers _ = pure { classification: const (pure { classification: "mocktography" }) }
