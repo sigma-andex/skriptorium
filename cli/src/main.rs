@@ -4,6 +4,7 @@ mod api;
 mod cmd;
 mod types;
 mod guesslang;
+mod dirs;
 
 use crate::cmd::scribe;
 

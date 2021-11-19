@@ -1,19 +1,18 @@
 extern crate tensorflow;
 
+use crate::types;
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::fs;
 use std::hash::Hash;
-use std::path::Path;
+use std::path;
 use tensorflow::Code;
 use tensorflow::Graph;
 use tensorflow::SessionOptions;
 use tensorflow::SessionRunArgs;
 use tensorflow::Status;
 use tensorflow::Tensor;
-
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 #[derive(Debug)]
 pub enum ClassificationError {
@@ -38,17 +37,18 @@ pub struct GuessLangSettings {
 }
 
 fn load_model(
-    path: &str,
+    path: path::PathBuf,
 ) -> std::result::Result<(tensorflow::SavedModelBundle, tensorflow::Graph), Box<tensorflow::Status>>
 {
-    let model_folder = format!("{}/model", path);
+    let mut model_folder = path;
+    model_folder.push("model");
     let key = "TF_CPP_MIN_LOG_LEVEL";
     env::set_var(key, "2");
-    if !Path::new(model_folder.as_str()).exists() {
+    if !model_folder.exists() {
         return Err(Box::new(
             Status::new_set(
                 Code::NotFound,
-                &format!("Model {} not found.", model_folder),
+                &format!("Model {:?} not found.", model_folder.to_str()),
             )
             .unwrap(),
         ));
@@ -131,16 +131,20 @@ fn swap<K: Eq + Hash + Clone, V: Eq + Hash + Clone>(hashmap: HashMap<K, V>) -> H
     }
     swapped
 }
-fn load_languages_config(path: &str) -> Result<(HashMap<String, String>, HashMap<String, String>)> {
-    let json = fs::read_to_string(format!("{}/languages.json", path))?;
+fn load_languages_config(
+    path: path::PathBuf,
+) -> types::Result<(HashMap<String, String>, HashMap<String, String>)> {
+    let mut languages_file = path;
+    languages_file.push("languages.json");
+    let json = fs::read_to_string(languages_file)?;
 
     let name_to_abbreviation: HashMap<String, String> = serde_json::from_str(json.as_str())?;
     let abbreviation_to_name: HashMap<String, String> = swap(name_to_abbreviation.clone());
     Ok((name_to_abbreviation, abbreviation_to_name))
 }
 
-pub fn load_settings(path: &str) -> Result<GuessLangSettings> {
-    let (name_to_abbreviation, abbreviation_to_name) = load_languages_config(path)?;
+pub fn load_settings(path: path::PathBuf) -> types::Result<GuessLangSettings> {
+    let (name_to_abbreviation, abbreviation_to_name) = load_languages_config(path.to_owned())?;
     let (bundle, graph) = load_model(path)?;
     Ok(GuessLangSettings {
         bundle,
