@@ -1,8 +1,8 @@
 extern crate clap;
 
 use crate::api::classification;
-use crate::types::Result;
 use crate::guesslang;
+use crate::types::Result;
 use console::style;
 use console::Emoji;
 use indicatif::ProgressBar;
@@ -116,8 +116,11 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
 
     let snippet = read_utf8_file("snippet.txt".to_owned()).await?;
 
-    let guess_lang_settings = guesslang::classification::load_settings("data/")?;
-    let classification_result = guesslang::classification::classify(&guess_lang_settings, snippet.to_string());
+    let guesslang_model_path = guesslang::model_downloader::retrieve_model().await?;
+    
+    let guess_lang_settings = guesslang::classification::load_settings(guesslang_model_path)?;
+    let classification_result =
+        guesslang::classification::classify(&guess_lang_settings, snippet.to_string());
 
     for (classification, score) in classification_result?.first().iter() {
         println!("{} - {}", &classification, &score);
