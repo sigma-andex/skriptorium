@@ -2,6 +2,7 @@ extern crate clap;
 
 use crate::api::classification;
 use crate::types::Result;
+use crate::guesslang;
 use console::style;
 use console::Emoji;
 use indicatif::ProgressBar;
@@ -75,7 +76,9 @@ pub async fn classification_task<'a>(snippet: String) -> Result<classification::
         loop {
             if let Ok(result) = rx.try_recv() {
                 let msg = match result {
-                    Ok(classification::Classification { classification }) if !classification.is_empty()=> {
+                    Ok(classification::Classification { classification })
+                        if !classification.is_empty() =>
+                    {
                         format!(
                             " {} {} {}",
                             CLASSIFIED,
@@ -112,6 +115,14 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
     println!("{} {}", PEN, style("Scribing now...").bold().white());
 
     let snippet = read_utf8_file("snippet.txt".to_owned()).await?;
+
+    let guess_lang_settings = guesslang::classification::load_settings("data/")?;
+    let classification_result = guesslang::classification::classify(&guess_lang_settings, snippet.to_string());
+
+    for (classification, score) in classification_result?.first().iter() {
+        println!("{} - {}", &classification, &score);
+    }
+
     let result = classification_task(snippet).await?;
 
     let markdown = format!("This is a library for {}", result.classification);

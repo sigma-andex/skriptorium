@@ -3,6 +3,7 @@ extern crate clap;
 mod api;
 mod cmd;
 mod types;
+mod guesslang;
 
 use crate::cmd::scribe;
 
