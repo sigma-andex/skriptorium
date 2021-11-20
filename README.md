@@ -1,3 +1,3 @@
 # skriptorium 🖋
 
-WIP
+WIP - Coming soon, stay tuned! 
