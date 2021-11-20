@@ -31,10 +31,14 @@ pub struct Classification {
     pub classification: String,
 }
 
+fn mk_snippet(snippet: String) -> String {
+    format!("```\n{}\n```", snippet.trim())
+}
+
 pub async fn classify(snippet: String) -> Result<Classification> {
     let client = reqwest::Client::new();
     let request = ClassificationRequest {
-        snippet: encode(snippet),
+        snippet: encode(mk_snippet(snippet)),
     };
     let request = serde_json::to_string(&request)?;
     info!("Sending request {}", request);

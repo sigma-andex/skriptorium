@@ -32,6 +32,10 @@ async fn main() -> Result<()> {
 
     if let Some(matches) = matches.subcommand_matches("scribe") {
         let result = scribe::scribe(matches).await;
+        match result {
+            Ok(res) => println!("Done."),
+            Err(err) => println!("{:?}", err)
+        }
     }
 
     Ok(())
