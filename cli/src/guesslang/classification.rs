@@ -67,7 +67,7 @@ fn load_model(
 pub fn classify(
     guess_lang_settings: &GuessLangSettings,
     snippet: String,
-) -> std::result::Result<Vec<(String, f32)>, Box<tensorflow::Status>> {
+) -> std::result::Result<Vec<(String, String, f32)>, Box<tensorflow::Status>> {
     let GuessLangSettings {
         bundle,
         graph,
@@ -105,19 +105,19 @@ pub fn classify(
         .collect();
 
     let sorted_results = {
-        let mut mapped: Vec<(String, f32)> = results
+        let mut mapped: Vec<(String, String, f32)> = results
             .iter()
             .flat_map(|(abbr, score)| {
                 {
                     abbreviation_to_name
                         .get(abbr)
                         .iter()
-                        .map(|name| (name.to_string(), score.clone()))
+                        .map(|name| (abbr.to_string(), name.to_string(), score.clone()))
                 }
-                .collect::<Vec<(String, f32)>>()
+                .collect::<Vec<(String, String, f32)>>()
             })
             .collect();
-        mapped.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        mapped.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
         mapped
     };
 

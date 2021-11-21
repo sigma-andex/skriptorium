@@ -14,7 +14,7 @@ import Routes.Routes as Routes
 main :: Effect Unit
 main = do
   app <- readAppEnvironment
-  handlers <- if app.mock then Api.mkMockHandlers app else Api.mkHandlers app
+  handlers <- Api.mkHandlers app.engine
   let
     port = 8080
     thankYou = "Thank you and good bye 👋"

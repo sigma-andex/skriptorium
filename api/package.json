@@ -26,6 +26,7 @@
     "spago": "^0.20.3"
   },
   "dependencies": {
-    "nlpcloud": "^1.0.13"
+    "nlpcloud": "^1.0.13",
+    "node-fetch": "^2.6.6"
   }
 }

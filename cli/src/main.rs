@@ -24,8 +24,8 @@ async fn main() -> Result<()> {
                 .arg_from_usage("-d, --debug 'Print debug information'"),
         )
         .subcommand(
-            SubCommand::with_name("record")
-                .about("listens for file changes to generate a new documentation")
+            SubCommand::with_name("watch")
+                .about("watchs for file changes to generate a new documentation")
                 .arg_from_usage("-d, --debug 'Print debug information'"),
         )
         .get_matches();

@@ -1,22 +1,36 @@
-module Api.Api (Handlers, mkHandlers, mkMockHandlers) where
+module Api.Api (mkHandlers) where
 
 import Prelude
 
 import AI.NLPCloud as NLPCloud
-import Api.Templates as Templates
-import Api.Types (ClassificationRequest, ClassificationResponse)
-import Data.Either (either)
-import Data.String (trim)
+import AI.OpenAI as OpenAI
+import Api.Types (Classification, Handlers)
+import Data.Array (head)
+import Data.Either (Either(..), either)
+import Data.Maybe (Maybe(..), maybe)
+import Data.String (Pattern(..), stripPrefix, trim)
 import Data.String.Base64 as B64
 import Effect (Effect)
 import Effect.Aff (Aff, error, throwError)
 import Effect.Class.Console (log)
-import Environment (AppEnvironment)
+import Environment (Engine(..))
+import Node.Encoding (Encoding(..))
+import Node.FS.Aff (readTextFile)
+import Node.Path (FilePath)
+import Types (Token)
 
-classification :: NLPCloud.Client -> ClassificationRequest -> Aff ClassificationResponse
-classification client { snippet } = do
+
+nlpCloudQATemplate :: FilePath -> String -> Aff String
+nlpCloudQATemplate fp snippet = readTextFile UTF8 fp <#> \template -> trim template <> "\nQ: \n" <> trim snippet <> "\nA: "
+
+openAIQATemplate :: FilePath -> String -> Aff String
+openAIQATemplate fp snippet = readTextFile UTF8 fp <#> \template -> trim template <> "\nQ: \n" <> trim snippet
+
+nlpCloudClassification :: NLPCloud.Client -> Classification
+nlpCloudClassification client req@{ language, snippet } = do
+  log $ "Got request" <> show req
   b64Decoded <- either (const $ throwError $ error "Not valid base64") pure $ B64.atob snippet
-  templatedQuery <- Templates.qaTemplate "templates/classification.txt" b64Decoded
+  templatedQuery <- nlpCloudQATemplate "templates/nlpcloud/classification.txt" b64Decoded
   let
     settings =
       { minLength: 10
@@ -35,18 +49,32 @@ classification client { snippet } = do
   log $ "Sending query:\n" <> templatedQuery
   { "data": { generated_text } } <- NLPCloud.generation client settings $ NLPCloud.Query templatedQuery
   log $ "Received result:\n" <> generated_text
-  pure { classification: trim generated_text }
+  pure $ Right { classification: Just $ trim generated_text }
 
-type Handlers =
-  { classification :: ClassificationRequest -> Aff ClassificationResponse
-  }
+openAIClassification :: Token -> Classification
+openAIClassification token req@{ language, snippet } = do
+  log $ "Got request" <> show req
+  b64Decoded <- either (const $ throwError $ error "Not valid base64") pure $ B64.atob snippet
+  templatedQuery <- openAIQATemplate "templates/openai/classification.txt" b64Decoded
+  let
+    completionRequest = OpenAI.fillCompletionRequest
+      { prompt: templatedQuery
+      , max_tokens: 50
+      , stop: ["###"] :: Array String
+      , temperature: 0.0
+      , top_p: 1.0
+      , frequency_penalty: 0.0
+      , presence_penalty: 0.0
+      }
+  log $ "Sending query:\n" <> templatedQuery
+  eitherCompletion <- OpenAI.completion token completionRequest
+  log $ either show (\r -> "Received result:\n" <> show r) eitherCompletion
+  let
+    clean = stripPrefix (Pattern "\nA: ") >>> map trim 
+    toClassification = _.choices >>> head >>> maybe (Left $ error "") (_.text >>> clean >>> { classification: _ } >>> pure)
+  pure $ eitherCompletion >>= toClassification
 
-mkHandlers :: AppEnvironment -> Effect Handlers
-mkHandlers { token } = do
-  client <- NLPCloud.makeClient token
-  pure
-    { classification: classification client
-    }
-
-mkMockHandlers :: AppEnvironment -> Effect Handlers
-mkMockHandlers _ = pure { classification: const (pure { classification: "mocktography" }) }
+mkHandlers :: Engine -> Effect Handlers
+mkHandlers (NLPCloud token) = NLPCloud.makeClient token <#> \client -> { classification: nlpCloudClassification client }
+mkHandlers (OpenAI token) = pure $ { classification: openAIClassification token }
+mkHandlers (Mock) = pure { classification: const (pure $ Right { classification: Just "mocktography" }) }

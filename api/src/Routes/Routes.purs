@@ -2,13 +2,13 @@ module Routes.Routes (routes) where
 
 import Prelude
 
-import Api.Api as Api
+import Api.Types as ApiTypes
 import Data.Argonaut (class DecodeJson, class EncodeJson, JsonDecodeError, decodeJson, encodeJson, parseJson, stringify)
 import Data.Array (drop)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import Effect.Aff (Aff, attempt)
+import Effect.Aff (Aff, Error)
 import Effect.Class.Console (log)
 import HTTPure ((!!))
 import HTTPure as HTTPure
@@ -30,13 +30,13 @@ defaultHandleRequest
   :: forall apiRequest apiResponse
    . DecodeJson apiRequest
   => EncodeJson apiResponse
-  => (apiRequest -> Aff apiResponse)
+  => (apiRequest -> Aff (Either Error apiResponse))
   -> HTTPure.Request
   -> HTTPure.ResponseM
 defaultHandleRequest handle request = case parseAndDecode request.body :: ErrorOr apiRequest of
   Right apiRequest ->
     do
-      eitherApiResponse <- attempt $ handle apiRequest
+      eitherApiResponse <- handle apiRequest
       case eitherApiResponse of
         Left err -> do
             log $ "An internal error occured: " <> show err 
@@ -50,9 +50,9 @@ defaultHandleRequest handle request = case parseAndDecode request.body :: ErrorO
     [ Tuple "Content-Type" "application/json"
     ]
 
-skriptioriumRoutes :: Api.Handlers -> HTTPure.Request -> HTTPure.ResponseM
+skriptioriumRoutes :: ApiTypes.Handlers -> HTTPure.Request -> HTTPure.ResponseM
 skriptioriumRoutes { classification } request@{ path: [ "classification" ], method: HTTPure.Post } = defaultHandleRequest classification request
 skriptioriumRoutes _ _ = HTTPure.notFound
 
-routes :: Api.Handlers -> HTTPure.Request -> HTTPure.ResponseM
+routes :: ApiTypes.Handlers -> HTTPure.Request -> HTTPure.ResponseM
 routes handlers = apiV1 (skriptioriumRoutes handlers)

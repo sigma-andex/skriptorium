@@ -24,20 +24,22 @@ impl fmt::Display for ClassificationError {
 #[derive(Serialize, Deserialize, Debug)]
 struct ClassificationRequest {
     snippet: String,
+    language: Option<String>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Classification {
-    pub classification: String,
+    pub classification: String
 }
 
 fn mk_snippet(snippet: String) -> String {
     format!("```\n{}\n```", snippet.trim())
 }
 
-pub async fn classify(snippet: String) -> Result<Classification> {
+pub async fn classify(maybe_language: Option<String>, snippet: String) -> Result<Classification> {
     let client = reqwest::Client::new();
     let request = ClassificationRequest {
+        language: maybe_language,
         snippet: encode(mk_snippet(snippet)),
     };
     let request = serde_json::to_string(&request)?;

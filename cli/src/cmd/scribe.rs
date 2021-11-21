@@ -21,10 +21,10 @@ const TICK_SETTINGS: (&str, u64) = ("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ", 80);
 #[cfg(windows)]
 const TICK_SETTINGS: (&str, u64) = (r"+-x| ", 200);
 
-static PEN: Emoji<'_, '_> = Emoji("🖋 ", "=>");
-static CROSS_MARK: Emoji<'_, '_> = Emoji("❌ ", "X");
+static PEN: Emoji<'_, '_> = Emoji("🖋", "=>");
+static CROSS_MARK: Emoji<'_, '_> = Emoji("❌", "X");
 static CLASSIFIED: Emoji<'_, '_> = Emoji("🗄️ ", "C");
-static LANGUAGE: Emoji<'_, '_> = Emoji("🌍 ", "L");
+static LANGUAGE: Emoji<'_, '_> = Emoji("🌍", "L");
 
 pub async fn read_utf8_file(file_name: String) -> Result<String> {
     let mut file = File::open(file_name).await?;
@@ -95,79 +95,15 @@ where
     result
 }
 
-pub async fn classification_task(snippet: String) -> Result<classification::Classification> {
-    let (tx, mut rx) = mpsc::channel(1);
 
-    let count = 30 * 100;
-    let pb = ProgressBar::new(count);
-    let progressbar_style = ProgressStyle::default_spinner()
-        .tick_chars(TICK_SETTINGS.0)
-        .template(" {spinner:.blue} {msg:<30} ");
-    pb.set_style(progressbar_style);
-
-    let classification_handle = tokio::spawn(async move {
-        let classification_result = classification::classify(snippet.to_owned()).await;
-        match classification_result {
-            Ok(classification) => {
-                tx.send(Ok(classification.clone())).await?;
-                Ok(classification)
-            }
-            Err(err) => {
-                tx.send(Err(
-                    classification::ClassificationError::ClassificationFailed,
-                ))
-                .await?;
-                Err(err)
-            }
-        }
-    });
-
-    let result_handle = tokio::spawn(async move {
-        loop {
-            if let Ok(result) = rx.try_recv() {
-                let msg = match result {
-                    Ok(classification::Classification { classification })
-                        if !classification.is_empty() =>
-                    {
-                        format!(
-                            " {} {} {}",
-                            CLASSIFIED,
-                            style("Classification successful: ").dim().white(),
-                            style(classification).dim().blue(),
-                        )
-                    }
-                    _ => format!(
-                        " {} {}",
-                        CROSS_MARK,
-                        style("Classification failed").dim().white()
-                    ),
-                };
-
-                pb.finish_with_message(msg);
-                break;
-            }
-            pb.set_message(format!(
-                "{}",
-                style("Running classification...").dim().white()
-            ));
-            pb.inc(1);
-            std::thread::sleep(Duration::from_millis(10));
-        }
-
-        yield_now().await
-    });
-
-    let (first, _) = tokio::try_join!(classification_handle, result_handle)?;
-    first
-}
-
-pub async fn language_detection(snippet: String) -> Result<Option<String>> {
+pub async fn language_detection(snippet: String) -> Result<Option<(String, String, f32)>> {
     let guesslang_model_path = guesslang::model_downloader::retrieve_model().await?;
     let guess_lang_settings = guesslang::classification::load_settings(guesslang_model_path)?;
     let classification_result = guesslang::classification::classify(&guess_lang_settings, snippet)?;
     Ok(classification_result
         .first()
-        .map(|(name, _)| name.to_string()))
+        .map(|t| t.clone())
+    )
 }
 
 pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
@@ -177,8 +113,8 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
 
     let running = format!("{}", style("Running language detection...").dim().white());
 
-    let success = |maybe_language: &Option<String>| match maybe_language {
-        Some(language) => format!(
+    let success = |maybe_language: &Option<(String, String, f32)>| match maybe_language {
+        Some((_, language, _)) => format!(
             "{} {} {}",
             LANGUAGE,
             style("Detected language:").dim().white(),
@@ -192,12 +128,12 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
     };
     let failure = |e: &Box<dyn std::error::Error + Send + Sync>| {
         format!(
-            " {} {}",
+            "{} {}",
             CROSS_MARK,
             style("Unable to detect language 😢").dim().white()
         )
     };
-    let result = create_task(
+    let detected_language = create_task(
         language_detection(snippet.clone()),
         running,
         success,
@@ -225,14 +161,14 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         )
     };
     let result: classification::Classification = create_task(
-        classification::classify(snippet.clone()),
+        classification::classify(detected_language.map(|(abbr,_,_)| abbr), snippet.clone()),
         running,
         success,
         failure,
     )
     .await?;
 
-    let markdown = format!("This is a library for {}", result.classification);
+    let markdown = format!("{}", result.classification);
     write_utf8_file("docs/README.md".to_owned(), markdown).await?;
     Ok(())
 }
