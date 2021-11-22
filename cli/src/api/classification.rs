@@ -29,7 +29,8 @@ struct ClassificationRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Classification {
-    pub classification: String
+    pub classification: String,
+    pub tldr: String
 }
 
 fn mk_snippet(snippet: String) -> String {

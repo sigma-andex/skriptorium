@@ -9,6 +9,7 @@ use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
 use std::future;
 use std::time::Duration;
+use std::fmt;
 use tokio;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -95,21 +96,33 @@ where
     result
 }
 
-
 pub async fn language_detection(snippet: String) -> Result<Option<(String, String, f32)>> {
     let guesslang_model_path = guesslang::model_downloader::retrieve_model().await?;
     let guess_lang_settings = guesslang::classification::load_settings(guesslang_model_path)?;
     let classification_result = guesslang::classification::classify(&guess_lang_settings, snippet)?;
-    Ok(classification_result
-        .first()
-        .map(|t| t.clone())
-    )
+    Ok(classification_result.first().map(|t| t.clone()))
+}
+
+#[derive(Debug)]
+pub enum ScribeError {
+    MissingInputParameter,
+}
+
+impl std::error::Error for ScribeError {}
+
+impl fmt::Display for ScribeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ScribeError::MissingInputParameter => write!(f, "Input file or folder missing."),
+        }
+    }
 }
 
 pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
+    let input_file = matches.value_of("INPUT").ok_or(ScribeError::MissingInputParameter)?;
     println!("{} {}", PEN, style("Scribing now...").bold().white());
 
-    let snippet = read_utf8_file("snippet.txt".to_owned()).await?;
+    let snippet = read_utf8_file(input_file.to_string()).await?;
 
     let running = format!("{}", style("Running language detection...").dim().white());
 
@@ -145,12 +158,15 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
 
     let success = |classification: &classification::Classification| {
         format!(
-            "{} {} {}",
+            "{} {}\n      {} {}\n      {} {}",
             CLASSIFIED,
-            style("Classification successful: ").dim().white(),
+            style("Classification successful:").dim().white(),
+            style("- name").dim().white(),
             style(classification.classification.to_string())
                 .dim()
                 .blue(),
+            style("- tldr").dim().white(),
+            style(classification.tldr.to_string()).dim().blue(),
         )
     };
     let failure = |e: &Box<dyn std::error::Error + Send + Sync>| {
@@ -161,14 +177,14 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         )
     };
     let result: classification::Classification = create_task(
-        classification::classify(detected_language.map(|(abbr,_,_)| abbr), snippet.clone()),
+        classification::classify(detected_language.map(|(abbr, _, _)| abbr), snippet.clone()),
         running,
         success,
         failure,
     )
     .await?;
 
-    let markdown = format!("{}", result.classification);
+    let markdown = format!("# {}\n\n{}", result.classification, result.tldr);
     write_utf8_file("docs/README.md".to_owned(), markdown).await?;
     Ok(())
 }

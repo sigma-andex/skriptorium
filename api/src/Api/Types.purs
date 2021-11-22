@@ -10,7 +10,8 @@ type ClassificationRequest =
   }
 
 type ClassificationResponse =
-  { classification :: Maybe String
+  { classification :: String
+  , tldr :: String
   }
 
 type Classification = ClassificationRequest -> Aff (Either Error ClassificationResponse)

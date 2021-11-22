@@ -8,7 +8,7 @@ app = Flask(__name__)
 def hello():
     return "Hello, World!"
 ```
-A: Flask is a minimalistic http micro-framework for Python.
+A: flask --- Flask is a minimalistic http micro-framework for Python.
 ###
 Q:
 ```
@@ -16,7 +16,7 @@ Q:
 >>> json.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
 '["foo", {"bar": ["baz", null, 1.0, 2]}]'
 ```
-A: simplejson is a simple json encoding/decoding library for Python.
+A: simplejson --- simplejson is a simple json encoding/decoding library for Python.
 ###
 Q: 
 ```
@@ -28,5 +28,5 @@ from tensorflow.keras.layers import Dense
 model.add(Dense(units=64, activation='relu'))
 model.add(Dense(units=10, activation='softmax'))
 ```
-A: keras is a machine-learning framework for Python.
+A: keras --- keras is a machine-learning framework for Python.
 ###

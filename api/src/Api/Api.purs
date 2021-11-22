@@ -6,9 +6,9 @@ import AI.NLPCloud as NLPCloud
 import AI.OpenAI as OpenAI
 import Api.Types (Classification, Handlers)
 import Data.Array (head)
-import Data.Either (Either(..), either)
+import Data.Either (Either(..), either, note)
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (Pattern(..), stripPrefix, trim)
+import Data.String (Pattern(..), split, stripPrefix, trim)
 import Data.String.Base64 as B64
 import Effect (Effect)
 import Effect.Aff (Aff, error, throwError)
@@ -49,7 +49,7 @@ nlpCloudClassification client req@{ language, snippet } = do
   log $ "Sending query:\n" <> templatedQuery
   { "data": { generated_text } } <- NLPCloud.generation client settings $ NLPCloud.Query templatedQuery
   log $ "Received result:\n" <> generated_text
-  pure $ Right { classification: Just $ trim generated_text }
+  pure $ Right { classification: trim generated_text, tldr: "" }
 
 openAIClassification :: Token -> Classification
 openAIClassification token req@{ language, snippet } = do
@@ -71,10 +71,16 @@ openAIClassification token req@{ language, snippet } = do
   log $ either show (\r -> "Received result:\n" <> show r) eitherCompletion
   let
     clean = stripPrefix (Pattern "\nA: ") >>> map trim 
-    toClassification = _.choices >>> head >>> maybe (Left $ error "") (_.text >>> clean >>> { classification: _ } >>> pure)
+    dataError = error "Failed to extract data"
+    extract s = case split (Pattern "---") s of 
+      [classification, tldr] -> Right { classification: trim classification, tldr: trim tldr }
+      _ -> Left dataError
+    toClassification { choices } = case head choices of 
+      Just { text } -> text # clean # note dataError >>= extract
+      Nothing -> Left dataError
   pure $ eitherCompletion >>= toClassification
 
 mkHandlers :: Engine -> Effect Handlers
 mkHandlers (NLPCloud token) = NLPCloud.makeClient token <#> \client -> { classification: nlpCloudClassification client }
 mkHandlers (OpenAI token) = pure $ { classification: openAIClassification token }
-mkHandlers (Mock) = pure { classification: const (pure $ Right { classification: Just "mocktography" }) }
+mkHandlers (Mock) = pure { classification: const (pure $ Right { classification: "mocktography", tldr: "tldr" }) }

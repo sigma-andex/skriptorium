@@ -2,13 +2,14 @@ extern crate clap;
 
 mod api;
 mod cmd;
-mod types;
-mod guesslang;
 mod dirs;
+mod guesslang;
+mod types;
+use console::style;
 
 use crate::cmd::scribe;
 
-use clap::{App, SubCommand};
+use clap::{App, SubCommand, Arg};
 use tokio;
 
 use types::Result;
@@ -21,6 +22,12 @@ async fn main() -> Result<()> {
         .subcommand(
             SubCommand::with_name("scribe")
                 .about("runs the generation")
+                .arg(
+                    Arg::with_name("INPUT")
+                        .help("Sets the input file to use")
+                        .required(true)
+                        .index(1),
+                )
                 .arg_from_usage("-d, --debug 'Print debug information'"),
         )
         .subcommand(
@@ -33,8 +40,8 @@ async fn main() -> Result<()> {
     if let Some(matches) = matches.subcommand_matches("scribe") {
         let result = scribe::scribe(matches).await;
         match result {
-            Ok(res) => println!("Done."),
-            Err(err) => println!("{:?}", err)
+            Ok(res) => println!("{}", style("\nDone.").dim().white()),
+            Err(err) => println!("{:?}", err),
         }
     }
 
