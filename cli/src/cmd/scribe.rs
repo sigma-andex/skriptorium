@@ -7,9 +7,9 @@ use console::style;
 use console::Emoji;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+use std::fmt;
 use std::future;
 use std::time::Duration;
-use std::fmt;
 use tokio;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -119,7 +119,9 @@ impl fmt::Display for ScribeError {
 }
 
 pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
-    let input_file = matches.value_of("INPUT").ok_or(ScribeError::MissingInputParameter)?;
+    let input_file = matches
+        .value_of("INPUT")
+        .ok_or(ScribeError::MissingInputParameter)?;
     println!("{} {}", PEN, style("Scribing now...").bold().white());
 
     let snippet = read_utf8_file(input_file.to_string()).await?;

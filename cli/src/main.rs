@@ -9,7 +9,7 @@ use console::style;
 
 use crate::cmd::scribe;
 
-use clap::{App, SubCommand, Arg};
+use clap::{App, Arg, SubCommand};
 use tokio;
 
 use types::Result;

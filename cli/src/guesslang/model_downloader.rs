@@ -17,7 +17,9 @@ impl error::Error for DownloadError {}
 impl fmt::Display for DownloadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DownloadError::FileCreationFailed(path) => write!(f, "Failed to create path {:?}", path.to_str()),
+            DownloadError::FileCreationFailed(path) => {
+                write!(f, "Failed to create path {:?}", path.to_str())
+            }
             DownloadError::DownloadError(err) => write!(f, "Failed to download file"),
         }
     }
@@ -49,12 +51,14 @@ pub async fn get_or_download_file(
         Ok(path_buf)
     } else {
         let absolute_url = base_url.join(file_url)?;
-        
+
         let response = reqwest::get(absolute_url).await?;
         let bytes = response.bytes().await?;
         let mut cursor = io::Cursor::new(bytes);
 
-        let parent_directory = &absolute_path.parent().ok_or(DownloadError::FileCreationFailed(absolute_path.clone()))?;
+        let parent_directory = &absolute_path
+            .parent()
+            .ok_or(DownloadError::FileCreationFailed(absolute_path.clone()))?;
         fs::create_dir_all(parent_directory)?;
 
         let mut dest = fs::OpenOptions::new()
@@ -88,7 +92,6 @@ pub async fn retrieve_model() -> types::Result<path::PathBuf> {
         "model/saved_model.pb",
     )
     .await?;
-
 
     let variables_index_file = get_or_download_file(
         &models_guesslang_dir_buf,
