@@ -3,18 +3,20 @@ extern crate clap;
 use crate::api::classification;
 use crate::guesslang;
 use crate::types::Result;
+use crate::cmd::directory_listing;
 use console::style;
 use console::Emoji;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+use std::env;
 use std::fmt;
 use std::future;
+use std::path;
 use std::time::Duration;
 use tokio;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
-use tokio::task::yield_now;
 
 #[cfg(not(windows))]
 const TICK_SETTINGS: (&str, u64) = ("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ", 80);
@@ -23,9 +25,11 @@ const TICK_SETTINGS: (&str, u64) = ("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ", 80);
 const TICK_SETTINGS: (&str, u64) = (r"+-x| ", 200);
 
 static PEN: Emoji<'_, '_> = Emoji("🖋", "=>");
-static CROSS_MARK: Emoji<'_, '_> = Emoji("❌", "X");
+static CROSS_MARK: Emoji<'_, '_> = Emoji("🔥", "X");
 static CLASSIFIED: Emoji<'_, '_> = Emoji("🗄️ ", "C");
 static LANGUAGE: Emoji<'_, '_> = Emoji("🌍", "L");
+static FILES: Emoji<'_, '_> = Emoji("🗂", "L");
+
 
 pub async fn read_utf8_file(file_name: String) -> Result<String> {
     let mut file = File::open(file_name).await?;
@@ -83,7 +87,7 @@ where
                 Err(err) => {
                     pb.set_message(format!(
                         "{}",
-                        style("Running classification...").dim().white()
+                        style(&running).dim().white()
                     ));
                     pb.inc(1);
                     std::thread::sleep(Duration::from_millis(10));
@@ -119,10 +123,46 @@ impl fmt::Display for ScribeError {
 }
 
 pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
+
     let input_file = matches
         .value_of("INPUT")
         .ok_or(ScribeError::MissingInputParameter)?;
     println!("{} {}", PEN, style("Scribing now...").bold().white());
+
+    let running = format!("{}", style("Collecting relevant files...").dim().white());
+
+    let success = |files: &Vec<path::PathBuf>| if !files.is_empty() {
+        format!(
+            "{}  {} {}",
+            FILES,
+            style(format!("{}",files.len())).dim().white()
+            ,
+            style("revelant files found!").dim().white()
+        )
+    } else {
+        format!(
+            "{}  {}",
+            FILES,
+            style("Got zero relevant files 🤷‍♀️").dim().white()
+        )
+    };
+
+    let failure = |e: &Box<dyn std::error::Error + Send + Sync>| {
+        format!(
+            "{} {}",
+            CROSS_MARK,
+            style("Unable to get relevant files 😢").dim().white()
+        )
+    };
+    let relevant_files = create_task(
+        directory_listing::list_directories_async(),
+        running,
+        success,
+        failure,
+    )
+    .await?;
+
+
 
     let snippet = read_utf8_file(input_file.to_string()).await?;
 

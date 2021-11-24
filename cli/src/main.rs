@@ -9,31 +9,30 @@ use console::style;
 
 use crate::cmd::scribe;
 
-use clap::{App, Arg, SubCommand};
+use clap::{crate_version, App, AppSettings, Arg, SubCommand};
 use tokio;
 
 use types::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let matches = App::new("skriptorium")
-        .version("1.0")
-        .about("...soon there will be more information here...")
+    let matches = App::new(format!("{}", style("skriptorium").bold()))
+        .version(crate_version!())
+        .about("\n...your little helper to write the boring documentation for you!")
+        .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("scribe")
-                .about("runs the generation")
+                .about("generate documentation for the INPUT folder")
                 .arg(
                     Arg::with_name("INPUT")
-                        .help("Sets the input file to use")
-                        .required(true)
+                        .help("The input folder to use")
+                        .default_value(".")
                         .index(1),
-                )
-                .arg_from_usage("-d, --debug 'Print debug information'"),
+                ),
         )
         .subcommand(
             SubCommand::with_name("watch")
-                .about("watchs for file changes to generate a new documentation")
-                .arg_from_usage("-d, --debug 'Print debug information'"),
+                .about("watches for file changes to generate a new documentation"),
         )
         .get_matches();
 
