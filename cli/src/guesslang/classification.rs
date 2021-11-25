@@ -111,28 +111,33 @@ pub fn classify(
         .map(|(abbr, score)| (abbr.to_string(), score.clone()))
         .collect();
 
-    let sorted_results = {
-        let mut mapped: Vec<ClassificationResult> = results
-            .iter()
-            .flat_map(|(abbr, score)| {
-                {
-                    abbreviation_to_name
-                        .get(abbr)
-                        .iter()
-                        .map(|name| ClassificationResult {
-                            identifier: abbr.to_string(),
-                            name: name.to_string(),
-                            score: score.clone(),
-                        })
-                }
-                .collect::<Vec<ClassificationResult>>()
-            })
-            .collect();
-        mapped.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
-        mapped
-    };
+    let sorted_results = sort_classifications(&results, &abbreviation_to_name);
 
     Ok(sorted_results)
+}
+
+fn sort_classifications(
+    classifications: &Vec<(String, f32)>,
+    abbreviation_to_name: &HashMap<String, String>,
+) -> Vec<ClassificationResult> {
+    let mut mapped: Vec<ClassificationResult> = classifications
+        .iter()
+        .flat_map(|(abbr, score)| {
+            {
+                abbreviation_to_name
+                    .get(abbr)
+                    .iter()
+                    .map(|name| ClassificationResult {
+                        identifier: abbr.to_string(),
+                        name: name.to_string(),
+                        score: score.clone(),
+                    })
+            }
+            .collect::<Vec<ClassificationResult>>()
+        })
+        .collect();
+    mapped.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+    mapped
 }
 
 fn swap<K: Eq + Hash + Clone, V: Eq + Hash + Clone>(hashmap: HashMap<K, V>) -> HashMap<V, K> {
