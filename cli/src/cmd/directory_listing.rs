@@ -28,13 +28,15 @@ fn is_hidden(entry: &walkdir::DirEntry) -> bool {
 }
 
 fn is_excluded_extension(entry: &walkdir::DirEntry) -> bool {
-    let excluded_extensions : Vec<&str> = vec!["lock"];
+    let excluded_extensions: Vec<&str> = vec!["lock"];
     entry
         .file_name()
         .to_str()
         .and_then(|s| {
             let p = path::Path::new(s);
-            p.extension().and_then(|e| e.to_str()).map(|e| excluded_extensions.contains(&e))
+            p.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| excluded_extensions.contains(&e))
         })
         .unwrap_or(false)
 }

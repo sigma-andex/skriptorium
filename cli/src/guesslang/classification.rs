@@ -1,6 +1,7 @@
 extern crate tensorflow;
 
 use crate::types;
+use futures::future::join_all;
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
@@ -12,7 +13,6 @@ use tensorflow::SessionOptions;
 use tensorflow::SessionRunArgs;
 use tensorflow::Status;
 use tensorflow::Tensor;
-use futures::future::join_all;
 use tokio::fs;
 
 #[derive(Debug)]
@@ -145,7 +145,8 @@ async fn load_languages_config(
 }
 
 pub async fn load_settings(path: path::PathBuf) -> types::Result<GuessLangSettings> {
-    let (name_to_abbreviation, abbreviation_to_name) = load_languages_config(path.to_owned()).await?;
+    let (name_to_abbreviation, abbreviation_to_name) =
+        load_languages_config(path.to_owned()).await?;
     let (bundle, graph) = load_model(path)?;
     Ok(GuessLangSettings {
         bundle,

@@ -163,11 +163,18 @@ pub async fn multi_language_detection(
 }
 pub fn language_display_name_or_default(language: &str) -> String {
     let mappings: collections::HashMap<String, String> = Asset::get("languages.json")
-        .and_then(|mappings_file| std::str::from_utf8(mappings_file.data.as_ref()).ok().map(|s|s.to_owned()))
+        .and_then(|mappings_file| {
+            std::str::from_utf8(mappings_file.data.as_ref())
+                .ok()
+                .map(|s| s.to_owned())
+        })
         .and_then(|json| serde_json::from_str(json.as_str()).ok())
         .unwrap_or(collections::HashMap::new());
 
-    mappings.get(language).unwrap_or(&language.to_owned()).to_string()
+    mappings
+        .get(language)
+        .unwrap_or(&language.to_owned())
+        .to_string()
 }
 
 pub fn get_primary_language(
@@ -183,10 +190,9 @@ pub fn get_primary_language(
         .map(|tuple| (tuple.0.clone(), tuple.1.clone()))
 }
 
-
 pub async fn language_detection2(files: Vec<path::PathBuf>) -> Result<Option<String>> {
     let languages = multi_language_detection(files).await?;
-    let determined_language = get_primary_language(&languages).map(|(k,_)| k);
+    let determined_language = get_primary_language(&languages).map(|(k, _)| k);
     Ok(determined_language)
 }
 
@@ -211,7 +217,10 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         .ok_or(ScribeError::MissingInputParameter)?;
     println!("{}  {}", PEN, style("Scribing now...").bold().white());
 
-    let running = format!("{}", style("Analysing repo for relevant files...").dim().white());
+    let running = format!(
+        "{}",
+        style("Analysing repo for relevant files...").dim().white()
+    );
 
     let success = |files: &Vec<path::PathBuf>| {
         if !files.is_empty() {
@@ -219,7 +228,9 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
                 "{}  {} {}",
                 FILES,
                 style("Repo analysis:").dim().white(),
-                style(format!("{} revelant files found.", files.len())).dim().white()
+                style(format!("{} revelant files found.", files.len()))
+                    .dim()
+                    .white()
             )
         } else {
             format!(
@@ -254,7 +265,9 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
             "{} {} {}",
             LANGUAGE,
             style("Detected language:").dim().white(),
-            style(language_display_name_or_default(language)).dim().blue(),
+            style(language_display_name_or_default(language))
+                .dim()
+                .blue(),
         ),
         None => format!(
             "{} {}",
