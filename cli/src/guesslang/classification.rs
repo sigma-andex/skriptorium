@@ -4,7 +4,6 @@ use crate::types;
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
-use std::fs;
 use std::hash::Hash;
 use std::path;
 use tensorflow::Code;
@@ -13,6 +12,8 @@ use tensorflow::SessionOptions;
 use tensorflow::SessionRunArgs;
 use tensorflow::Status;
 use tensorflow::Tensor;
+use futures::future::join_all;
+use tokio::fs;
 
 #[derive(Debug)]
 pub enum ClassificationError {
@@ -131,20 +132,20 @@ fn swap<K: Eq + Hash + Clone, V: Eq + Hash + Clone>(hashmap: HashMap<K, V>) -> H
     }
     swapped
 }
-fn load_languages_config(
+async fn load_languages_config(
     path: path::PathBuf,
 ) -> types::Result<(HashMap<String, String>, HashMap<String, String>)> {
     let mut languages_file = path;
     languages_file.push("languages.json");
-    let json = fs::read_to_string(languages_file)?;
+    let json = fs::read_to_string(languages_file).await?;
 
     let name_to_abbreviation: HashMap<String, String> = serde_json::from_str(json.as_str())?;
     let abbreviation_to_name: HashMap<String, String> = swap(name_to_abbreviation.clone());
     Ok((name_to_abbreviation, abbreviation_to_name))
 }
 
-pub fn load_settings(path: path::PathBuf) -> types::Result<GuessLangSettings> {
-    let (name_to_abbreviation, abbreviation_to_name) = load_languages_config(path.to_owned())?;
+pub async fn load_settings(path: path::PathBuf) -> types::Result<GuessLangSettings> {
+    let (name_to_abbreviation, abbreviation_to_name) = load_languages_config(path.to_owned()).await?;
     let (bundle, graph) = load_model(path)?;
     Ok(GuessLangSettings {
         bundle,

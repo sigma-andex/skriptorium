@@ -1,8 +1,8 @@
+use crate::types;
 use std::env;
 use std::fmt;
 use std::path;
 use walkdir;
-use crate::types;
 
 #[derive(Debug)]
 pub enum DirectoryListingError {
@@ -27,11 +27,20 @@ fn is_hidden(entry: &walkdir::DirEntry) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn list_directories_async() -> types::Result<Vec<path::PathBuf>> {
+fn is_excluded_extension(entry: &walkdir::DirEntry) -> bool {
+    let excluded_extensions : Vec<&str> = vec!["lock"];
+    entry
+        .file_name()
+        .to_str()
+        .and_then(|s| {
+            let p = path::Path::new(s);
+            p.extension().and_then(|e| e.to_str()).map(|e| excluded_extensions.contains(&e))
+        })
+        .unwrap_or(false)
+}
 
-    let handle = tokio::spawn(async {
-        list_directories()
-    });
+pub async fn list_directories_async() -> types::Result<Vec<path::PathBuf>> {
+    let handle = tokio::spawn(async { list_directories() });
     handle.await?
 }
 
@@ -47,7 +56,7 @@ pub fn list_directories() -> types::Result<Vec<path::PathBuf>> {
     let results: Vec<path::PathBuf> = walkdir::WalkDir::new(".")
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| !is_hidden(e))
+        .filter(|e| !is_hidden(e) && !is_excluded_extension(e))
         .filter_map(|entry| {
             let entry_path = path::PathBuf::from(entry.path());
             let entry_path2 = entry_path.clone();
