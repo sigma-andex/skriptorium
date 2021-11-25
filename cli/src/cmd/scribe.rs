@@ -104,14 +104,6 @@ where
     result
 }
 
-pub async fn language_detection(snippet: String) -> Result<Option<(String, String, f32)>> {
-    let guesslang_model_path = guesslang::model_downloader::retrieve_model().await?;
-    let guess_lang_settings =
-        guesslang::classification::load_settings(guesslang_model_path).await?;
-    let classification_result = guesslang::classification::classify(&guess_lang_settings, snippet)?;
-    Ok(classification_result.first().map(|t| t.clone()))
-}
-
 pub async fn multi_language_detection(
     files: Vec<path::PathBuf>,
 ) -> Result<collections::HashMap<String, u64>> {
@@ -190,7 +182,7 @@ pub fn get_primary_language(
         .map(|tuple| (tuple.0.clone(), tuple.1.clone()))
 }
 
-pub async fn language_detection2(files: Vec<path::PathBuf>) -> Result<Option<String>> {
+pub async fn language_detection(files: Vec<path::PathBuf>) -> Result<Option<String>> {
     let languages = multi_language_detection(files).await?;
     let determined_language = get_primary_language(&languages).map(|(k, _)| k);
     Ok(determined_language)
@@ -219,7 +211,7 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
 
     let running = format!(
         "{}",
-        style("Analysing repo for relevant files...").dim().white()
+        style("Scanning repo for source files...").dim().white()
     );
 
     let success = |files: &Vec<path::PathBuf>| {
@@ -228,16 +220,15 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
                 "{}  {} {}",
                 FILES,
                 style("Repo analysis:").dim().white(),
-                style(format!("{} revelant files found.", files.len()))
-                    .dim()
-                    .white()
+                style(format!("{} revelant source files found.", files.len()))
+                    .blue()
             )
         } else {
             format!(
                 "{}  {} {}",
                 FILES,
                 style("Repo analysis:").dim().white(),
-                style("Got zero relevant files 🤷‍♀️").dim().white()
+                style("Got zero relevant source files 🤷‍♀️").dim().white()
             )
         }
     };
@@ -266,7 +257,6 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
             LANGUAGE,
             style("Detected language:").dim().white(),
             style(language_display_name_or_default(language))
-                .dim()
                 .blue(),
         ),
         None => format!(
@@ -283,7 +273,7 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         )
     };
     let detected_language = create_task(
-        language_detection2(relevant_files),
+        language_detection(relevant_files),
         running,
         success,
         failure,
@@ -299,10 +289,9 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
             style("Classification successful:").dim().white(),
             style("- name").dim().white(),
             style(classification.classification.to_string())
-                .dim()
                 .blue(),
             style("- tldr").dim().white(),
-            style(classification.tldr.to_string()).dim().blue(),
+            style(classification.tldr.to_string()).blue(),
         )
     };
     let failure = |e: &Box<dyn std::error::Error + Send + Sync>| {
