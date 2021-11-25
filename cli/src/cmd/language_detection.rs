@@ -16,12 +16,8 @@ struct Asset;
 
 pub async fn multi_language_detection(
     files: Vec<path::PathBuf>,
+    guess_lang_settings: guesslang::classification::GuessLangSettings,
 ) -> Result<collections::HashMap<String, u64>> {
-    let guesslang_model_path = guesslang::model_downloader::retrieve_model().await?;
-
-    let guess_lang_settings =
-        guesslang::classification::load_settings(guesslang_model_path).await?;
-
     let settings_box = std::sync::Arc::new(guess_lang_settings);
 
     let mut tasks: Vec<task::JoinHandle<Option<(String, u64)>>> = Vec::new();
@@ -40,7 +36,7 @@ pub async fn multi_language_detection(
                     {
                         maybe_classifications
                             .first()
-                            .map(|(name, _, _)| (name.to_string(), file_size))
+                            .map(|classification| (classification.name.to_string(), file_size))
                     } else {
                         None
                     }
@@ -57,7 +53,9 @@ pub async fn multi_language_detection(
     Ok(results_map)
 }
 
-pub fn classifications_to_map(classifications: &Vec<(String, u64)>) -> collections::HashMap<String, u64>  {
+pub fn classifications_to_map(
+    classifications: &Vec<(String, u64)>,
+) -> collections::HashMap<String, u64> {
     let mut results_map: collections::HashMap<String, u64> = collections::HashMap::new();
     for (name, size) in classifications.iter() {
         if let Some(x) = results_map.get_mut(name) {
@@ -99,7 +97,10 @@ pub fn get_primary_language(
 }
 
 pub async fn language_detection(files: Vec<path::PathBuf>) -> Result<Option<String>> {
-    let languages = multi_language_detection(files).await?;
+    let guesslang_model_path = guesslang::model_downloader::retrieve_model().await?;
+    let guess_lang_settings =
+        guesslang::classification::load_settings(guesslang_model_path).await?;
+    let languages = multi_language_detection(files, guess_lang_settings).await?;
     let determined_language = get_primary_language(&languages).map(|(k, _)| k);
     Ok(determined_language)
 }
