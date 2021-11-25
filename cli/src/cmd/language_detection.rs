@@ -50,19 +50,25 @@ pub async fn multi_language_detection(
 
     let results: Vec<std::result::Result<Option<(String, u64)>, task::JoinError>> =
         futures::future::join_all(tasks).await;
-
     let successful_results: Vec<Option<(String, u64)>> = results.into_iter().flatten().collect();
     let some_results: Vec<(String, u64)> = successful_results.into_iter().flatten().collect();
+
+    let results_map: collections::HashMap<String, u64> = classifications_to_map(&some_results);
+    Ok(results_map)
+}
+
+pub fn classifications_to_map(classifications: &Vec<(String, u64)>) -> collections::HashMap<String, u64>  {
     let mut results_map: collections::HashMap<String, u64> = collections::HashMap::new();
-    for (name, size) in some_results.iter() {
+    for (name, size) in classifications.iter() {
         if let Some(x) = results_map.get_mut(name) {
             *x += size;
         } else {
             results_map.insert(name.to_string(), *size);
         }
     }
-    Ok(results_map)
+    results_map
 }
+
 pub fn language_display_name_or_default(language: &str) -> String {
     let mappings: collections::HashMap<String, String> = Asset::get("languages.json")
         .and_then(|mappings_file| {
