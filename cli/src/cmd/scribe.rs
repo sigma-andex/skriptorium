@@ -203,9 +203,21 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
             style("- tldr").dim().white(),
             style(tldr.to_string()).blue(),
             style("- version").dim().white(),
-            style(version.as_ref().map(|v|v.to_string()).unwrap_or("".to_string())).blue(),
+            style(
+                version
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or("".to_string())
+            )
+            .blue(),
             style("- license").dim().white(),
-            style(license.as_ref().map(|l|l.to_string()).unwrap_or("".to_string())).blue(),
+            style(
+                license
+                    .as_ref()
+                    .map(|l| l.to_string())
+                    .unwrap_or("".to_string())
+            )
+            .blue(),
         )
     };
     let failure = |e: &Box<dyn std::error::Error + Send + Sync>| {
@@ -228,9 +240,30 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         failure,
     )
     .await?;
-    let license_badge = result.license.as_ref().map(|license| format!("![{}](https://img.shields.io/badge/license-{}-blue)", license, license)).unwrap_or("".to_string());
-    let version_badge = result.version.as_ref().map(|version| format!("![{}](https://img.shields.io/badge/version-{}-red)", version, version)).unwrap_or("".to_string());
-    let markdown = format!("{} {}\n# {}\n\n{}\n\n## Usage\n\n{}", version_badge, license_badge, result.name, result.tldr, result.usage);
+    let license_badge = result
+        .license
+        .as_ref()
+        .map(|license| {
+            format!(
+                "![{}](https://img.shields.io/badge/license-{}-blue)",
+                license, license
+            )
+        })
+        .unwrap_or("".to_string());
+    let version_badge = result
+        .version
+        .as_ref()
+        .map(|version| {
+            format!(
+                "![{}](https://img.shields.io/badge/version-{}-red)",
+                version, version
+            )
+        })
+        .unwrap_or("".to_string());
+    let markdown = format!(
+        "{} {}\n# {}\n\n{}\n\n## Usage\n\n{}",
+        version_badge, license_badge, result.name, result.tldr, result.usage
+    );
     util::write_utf8_file("docs/README.md".to_owned(), markdown).await?;
     Ok(())
 }

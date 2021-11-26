@@ -48,13 +48,15 @@ pub async fn classify(
         let my_path2 = file_path_buf.clone();
         tasks.push(tokio::spawn(async move {
             let content = util::read_utf8_file(my_path.as_path()).await?;
-            Ok((my_path2.as_path().to_str().map(|p|p.to_string()), content))
+            Ok((my_path2.as_path().to_str().map(|p| p.to_string()), content))
         }));
     }
 
-    let file_contents: Vec<std::result::Result<types::Result<(Option<String>, String)>, task::JoinError>> =
-        futures::future::join_all(tasks).await;
-    let result: types::Result<Vec<(Option<String>, String)>> = file_contents.into_iter().flatten().collect();
+    let file_contents: Vec<
+        std::result::Result<types::Result<(Option<String>, String)>, task::JoinError>,
+    > = futures::future::join_all(tasks).await;
+    let result: types::Result<Vec<(Option<String>, String)>> =
+        file_contents.into_iter().flatten().collect();
     let files = result?;
     let classification = classification::classify(detected_language, files).await?;
     Ok(classification)

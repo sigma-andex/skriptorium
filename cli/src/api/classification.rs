@@ -22,7 +22,6 @@ impl fmt::Display for ClassificationError {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 struct ClassificationFile {
     name: Option<String>,
@@ -59,7 +58,13 @@ pub async fn classify(
     files: Vec<(Option<String>, String)>,
 ) -> Result<Classification> {
     let client = reqwest::Client::new();
-    let encoded_files: Vec<ClassificationFile> = files.iter().map(|(name, content)| ClassificationFile { name:name.clone(), content: encode(content.trim()) }).collect();
+    let encoded_files: Vec<ClassificationFile> = files
+        .iter()
+        .map(|(name, content)| ClassificationFile {
+            name: name.clone(),
+            content: encode(content.trim()),
+        })
+        .collect();
     let request = ClassificationRequest {
         language: maybe_language,
         files: encoded_files,

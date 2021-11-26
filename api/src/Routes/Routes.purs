@@ -40,11 +40,11 @@ defaultHandleRequest handle request = case parseAndDecode request.body :: ErrorO
       eitherApiResponse <- handle apiRequest
       case eitherApiResponse of
         Left err -> do
-            log $ "An internal error occured: " <> show err 
-            HTTPure.internalServerError' jsonHeaders $ encodeAndStringify { error: "An internal server error occured. Please try again later" }
+          log $ "An internal error occured: " <> show err
+          HTTPure.internalServerError' jsonHeaders $ encodeAndStringify { error: "An internal server error occured. Please try again later" }
         Right apiResponse -> HTTPure.ok' jsonHeaders $ spy "sending json" $ encodeAndStringify apiResponse
   Left err -> do
-    log $ "Got invalid request" <> show err 
+    log $ "Got invalid request" <> show err
     HTTPure.badRequest' jsonHeaders $ encodeAndStringify { error: "Unable to parse request format." }
   where
   jsonHeaders = HTTPure.headers
