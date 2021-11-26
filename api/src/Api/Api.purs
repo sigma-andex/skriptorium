@@ -75,13 +75,13 @@ openAIClassification token req@{ language, files } = do
 
     contentRequest query = OpenAI.fillCompletionRequest
       { prompt: query
-      , max_tokens: 60
+      , max_tokens: 70
       , stop: [ separator ] :: Array String
       , temperature: 0.0
       , top_p: 1.0
       , n: 1
       , frequency_penalty: 0.0
-      , presence_penalty: 1.0
+      , presence_penalty: 0.6
       }
 
     qaRequest query = OpenAI.fillCompletionRequest
