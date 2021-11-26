@@ -1,4 +1,4 @@
-![ 0.1.0](https://img.shields.io/badge/version- 0.1.0-red) ![ MIT](https://img.shields.io/badge/license- MIT-blue)
+![0.1.0](https://img.shields.io/badge/version-0.1.0-red) ![MIT](https://img.shields.io/badge/license-MIT-blue)
 # Skriptorium
 
 Skriptorium is a tool to generate documentation for your code. It uses deep learning to analyze your code and generate a documentation based on the code structure.
