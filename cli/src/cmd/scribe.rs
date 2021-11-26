@@ -261,8 +261,9 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         })
         .unwrap_or("".to_string());
     let markdown = format!(
-        "{} {}\n# {}\n\n{}\n\n## Usage\n\n{}",
-        version_badge, license_badge, result.name, result.tldr, result.usage
+        //"{} {}\n# {}\n\n{}\n\n## Usage\n\n{}",
+        "{} {}\n# {}\n\n{}\n\n",
+        version_badge, license_badge, result.name, result.tldr //, result.usage
     );
     util::write_utf8_file("docs/README.md".to_owned(), markdown).await?;
     Ok(())

@@ -48,9 +48,9 @@ openAIClassification token req@{ language, files } = do
       Just "rs" -> "Rust "
       _ -> ""
 
-    contentPrefix lang = "The following code snippets are from a " <> langToName lang <> "project."
+    contentPrefix lang = "The following code snippets are from a " <> langToName lang <> "project.\n"
 
-    qaPrefix lang = "The following code snippets are from a " <> langToName lang <> "project. Write the answer of question Q: into A: "
+    qaPrefix lang = "The following code snippets are from a " <> langToName lang <> "project. Write the answer of question Q: into A: \n"
 
     header (Just name) = "--- " <> name <> " ---\n"
     header Nothing = "--- ---\n"
@@ -61,8 +61,6 @@ openAIClassification token req@{ language, files } = do
     metaQuestion = "\nQ: What is the name, version and license of this project as a comma-separated list?\nA:"
     tldrQuestion = "\nWhat is this project about?\n"
     usageQuestion = "\nHow can I use this project?\n"
-    -- versionQuestion = "\nQ: What is the version of this project?\nA:"
-    -- licenseQuestion = "\nQ: What is the license of this project?\nA:"
 
     mkContentQuery question = contentPrefix language <> concatenated <> separator <> question
     mkQaQuery question = qaPrefix language <> concatenated <> separator <> question
@@ -70,18 +68,16 @@ openAIClassification token req@{ language, files } = do
     tldrQuery = mkContentQuery tldrQuestion
     usageQuery = mkContentQuery usageQuestion
     metaQuery = mkQaQuery metaQuestion
-    -- licenseQuery = mkQaQuery licenseQuestion
-    -- nameQuery = mkQaQuery nameQuestion
 
     contentRequest query = OpenAI.fillCompletionRequest
       { prompt: query
-      , max_tokens: 70
+      , max_tokens: 120
       , stop: [ separator ] :: Array String
       , temperature: 0.0
       , top_p: 1.0
       , n: 1
       , frequency_penalty: 0.0
-      , presence_penalty: 0.6
+      , presence_penalty: 0.7
       }
 
     qaRequest query = OpenAI.fillCompletionRequest
@@ -97,7 +93,7 @@ openAIClassification token req@{ language, files } = do
 
     extractMetadata :: String -> Maybe { name :: String, version :: Maybe String, license :: Maybe String }
     extractMetadata answer = case split (Pattern ",") answer of
-      [ name, version, license ] -> Just { name, version: Just version, license: Just license }
+      [ name, version, license ] -> Just { name: trim name, version: Just $ trim version, license: Just $ trim license }
       [ name ] -> Just { name, version: Nothing, license: Nothing }
       _ -> Nothing
 
@@ -106,22 +102,19 @@ openAIClassification token req@{ language, files } = do
 
   log $ "Sending query:\n" <> tldrQuery
   eitherTldr <- OpenAI.completion token (contentRequest tldrQuery) <#> bindFlipped extractFirstChoice
-  eitherUsage <- OpenAI.completion token (contentRequest usageQuery) <#> bindFlipped extractFirstChoice
+  --eitherUsage <- OpenAI.completion token (contentRequest usageQuery) <#> bindFlipped extractFirstChoice
   eitherMetadata <- OpenAI.completion token (qaRequest metaQuery) <#> bindFlipped (extractFirstChoice >>> map toMetadata)
-  -- eitherName <- OpenAI.completion token (qaRequest nameQuery) <#> bindFlipped (extractFirstChoice >>> map (\a -> extractSingleAnswer a # maybe a identity))
-  -- eitherVersion <- OpenAI.completion token (qaRequest versionQuery) <#> bindFlipped (extractFirstChoice >>> map (\a -> extractSingleAnswer a))
-  -- eitherLicense <- OpenAI.completion token (qaRequest licenseQuery) <#> bindFlipped (extractFirstChoice >>> map (\a -> extractSingleAnswer a))
+  
   log $ either show (\r -> "Received name:\n" <> show r) eitherMetadata
   log $ either show (\r -> "Received tldr:\n" <> show r) eitherTldr
-  log $ either show (\r -> "Received usage:\n" <> show r) eitherUsage
-  -- log $ either show (\r -> "Received version:\n" <> show r) eitherVersion
-  -- log $ either show (\r -> "Received license:\n" <> show r) eitherLicense
+  --log $ either show (\r -> "Received usage:\n" <> show r) eitherUsage
+  
   let
     result = do
       { name, version, license } <- eitherMetadata
       tldr <- eitherTldr
-      usage <- eitherUsage
-      pure { name, tldr, usage, version, license }
+      --usage <- eitherUsage
+      pure { name, tldr, usage: "", version, license }
   log $ "Sending result:\n" <> show result
   pure $ result
 
