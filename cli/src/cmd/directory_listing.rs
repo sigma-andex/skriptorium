@@ -59,7 +59,7 @@ pub fn list_directories() -> types::Result<Vec<path::PathBuf>> {
 
     let cur_dir = env::current_dir().unwrap();
 
-    let results: Vec<path::PathBuf> = walkdir::WalkDir::new(".")
+    let results: Vec<path::PathBuf> = walkdir::WalkDir::new(".").max_depth(3) 
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| !is_hidden(e) && !is_excluded_extension(e) && !is_directory(e))
