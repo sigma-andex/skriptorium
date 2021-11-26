@@ -7,9 +7,11 @@
   , "b64"
   , "bifunctors"
   , "console"
+  , "debug"
   , "effect"
   , "either"
   , "exceptions"
+  , "foldable-traversable"
   , "heterogeneous-extrablatt"
   , "httpure"
   , "justifill"
@@ -25,8 +27,10 @@
   , "prelude"
   , "psci-support"
   , "strings"
+  , "stringutils"
   , "transformers"
   , "tuples"
+  , "unfoldable"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

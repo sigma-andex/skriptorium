@@ -27,6 +27,10 @@ fn is_hidden(entry: &walkdir::DirEntry) -> bool {
         .unwrap_or(false)
 }
 
+fn is_directory(entry: &walkdir::DirEntry) -> bool {
+    entry.path().is_dir()
+}
+
 fn is_excluded_extension(entry: &walkdir::DirEntry) -> bool {
     let excluded_extensions: Vec<&str> = vec!["lock"];
     entry
@@ -58,7 +62,7 @@ pub fn list_directories() -> types::Result<Vec<path::PathBuf>> {
     let results: Vec<path::PathBuf> = walkdir::WalkDir::new(".")
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| !is_hidden(e) && !is_excluded_extension(e))
+        .filter(|e| !is_hidden(e) && !is_excluded_extension(e) && !is_directory(e))
         .filter_map(|entry| {
             let entry_path = path::PathBuf::from(entry.path());
             let entry_path2 = entry_path.clone();

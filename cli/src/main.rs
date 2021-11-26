@@ -18,7 +18,7 @@ use types::Result;
 async fn main() -> Result<()> {
     let matches = App::new(format!("{}", style("skriptorium").bold()))
         .version(crate_version!())
-        .about("\n...your little helper to write the boring documentation for you!")
+        .about("\n...your little helper to write the boring documentation for you!\nSkriptorium analyses your code repo to generate documentation automatically using deep learning (Guesslang, OpenAI and NLPCloud).")
         .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("scribe")

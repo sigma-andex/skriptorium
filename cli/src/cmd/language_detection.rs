@@ -34,9 +34,9 @@ pub async fn multi_language_detection(
                     if let Some(maybe_classifications) =
                         guesslang::classification::classify(&*my_box, file_contents).ok()
                     {
-                        maybe_classifications
-                            .first()
-                            .map(|classification| (classification.name.to_string(), file_size))
+                        maybe_classifications.first().map(|classification| {
+                            (classification.identifier.to_string(), file_size)
+                        })
                     } else {
                         None
                     }

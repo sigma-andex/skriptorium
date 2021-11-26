@@ -4,21 +4,24 @@ import Prelude
 
 import AI.NLPCloud as NLPCloud
 import AI.OpenAI as OpenAI
-import Api.Types (Classification, Handlers)
-import Data.Array (head)
+import Api.Types (Classification, Handlers, Selection)
+import Control.Bind (bindFlipped)
+import Data.Array (filter, foldl, head)
 import Data.Either (Either(..), either, note)
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (Pattern(..), split, stripPrefix, trim)
+import Data.String (Pattern(..), split, trim)
 import Data.String.Base64 as B64
+import Data.String.Common (joinWith)
+import Data.String.Utils (includes)
+import Data.Traversable (traverse)
 import Effect (Effect)
-import Effect.Aff (Aff, error, throwError)
-import Effect.Class.Console (log)
+import Effect.Aff (Aff, Error, error, throwError)
+import Effect.Class.Console (log, logShow)
 import Environment (Engine(..))
 import Node.Encoding (Encoding(..))
 import Node.FS.Aff (readTextFile)
 import Node.Path (FilePath)
 import Types (Token)
-
 
 nlpCloudQATemplate :: FilePath -> String -> Aff String
 nlpCloudQATemplate fp snippet = readTextFile UTF8 fp <#> \template -> trim template <> "\nQ: \n" <> trim snippet <> "\nA: "
@@ -27,60 +30,130 @@ openAIQATemplate :: FilePath -> String -> Aff String
 openAIQATemplate fp snippet = readTextFile UTF8 fp <#> \template -> trim template <> "\nQ: \n" <> trim snippet
 
 nlpCloudClassification :: NLPCloud.Client -> Classification
-nlpCloudClassification client req@{ language, snippet } = do
-  log $ "Got request" <> show req
-  b64Decoded <- either (const $ throwError $ error "Not valid base64") pure $ B64.atob snippet
-  templatedQuery <- nlpCloudQATemplate "templates/nlpcloud/classification.txt" b64Decoded
-  let
-    settings =
-      { minLength: 10
-      , maxLength: 50
-      , endSequence: "\n###"
-      , removeInput: true
-      , numBeams: 1
-      , noRepeatNgramSize: 0
-      , numReturnSequences: 1
-      , topK: 0.0
-      , topP: 0.7
-      , temperature: 1.0
-      , repetitionPenalty: 1.0
-      , lengthPenalty: 1.0
-      }
-  log $ "Sending query:\n" <> templatedQuery
-  { "data": { generated_text } } <- NLPCloud.generation client settings $ NLPCloud.Query templatedQuery
-  log $ "Received result:\n" <> generated_text
-  pure $ Right { classification: trim generated_text, tldr: "" }
+nlpCloudClassification client req@{ language, files } = do
+  pure $ Right { name: "", tldr: "", usage: "", version: Nothing, license: Nothing }
+
+extractFirstChoice :: OpenAI.CompletionResponseProps Maybe -> Either Error String
+extractFirstChoice { choices } = head choices <#> (_.text >>> trim) # note (error "No choice available")
+
+extractSingleAnswer :: String -> Maybe String
+extractSingleAnswer s = split (Pattern ("Q:")) s # head <#> trim
 
 openAIClassification :: Token -> Classification
-openAIClassification token req@{ language, snippet } = do
+openAIClassification token req@{ language, files } = do
   log $ "Got request" <> show req
-  b64Decoded <- either (const $ throwError $ error "Not valid base64") pure $ B64.atob snippet
-  templatedQuery <- openAIQATemplate "templates/openai/classification.txt" b64Decoded
+  b64Decoded <- either (const $ throwError $ error "#Not valid base64") pure $ traverse (\{ name, content } -> B64.atob content <#> \decoded -> { name, decoded }) files
   let
+    langToName lang = case language of
+      Just "rs" -> "Rust "
+      _ -> ""
+
+    contentPrefix lang = "The following code snippets are from a " <> langToName lang <> "project."
+
+    qaPrefix lang = "The following code snippets are from a " <> langToName lang <> "project. Write the answer of question Q: into A: "
+
+    header (Just name) = "--- " <> name <> " ---\n"
+    header Nothing = "--- ---\n"
+    concatenate acc { name, decoded } = acc <> (header name) <> decoded <> "\n\n"
+
+    concatenated = foldl concatenate "" b64Decoded
+
+    nameQuestion = "\nQ: What is the name of this project?\nA:"
+    tldrQuestion = "\nWhat is this project about?\n"
+    usageQuestion = "\nHow can I use this project?\n"
+    versionQuestion = "\nQ: What is the version of this project?\nA:"
+    licenseQuestion = "\nQ: What is the license of this project?\nA:"
+
+    mkContentQuery question = contentPrefix language <> concatenated <> separator <> question
+    mkQaQuery question = qaPrefix language <> concatenated <> separator <> question
+
+    nameQuery = mkQaQuery nameQuestion
+    tldrQuery = mkContentQuery tldrQuestion
+    usageQuery = mkContentQuery usageQuestion
+    versionQuery = mkQaQuery versionQuestion
+    licenseQuery = mkQaQuery licenseQuestion
+
+    contentRequest query = OpenAI.fillCompletionRequest
+      { prompt: query
+      , max_tokens: 70
+      , stop: [ separator ] :: Array String
+      , temperature: 0.0
+      , top_p: 1.0
+      , n: 1
+      , frequency_penalty: 0.0
+      , presence_penalty: 0.6
+      }
+
+    qaRequest query = OpenAI.fillCompletionRequest
+      { prompt: query
+      , max_tokens: 10
+      , stop: [ separator ] :: Array String
+      , temperature: 0.0
+      , top_p: 1.0
+      , n: 1
+      , frequency_penalty: 0.0
+      , presence_penalty: 0.4
+      }
+
+  log $ "Sending query:\n" <> tldrQuery
+  eitherTldr <- OpenAI.completion token (contentRequest tldrQuery) <#> bindFlipped extractFirstChoice
+  eitherUsage <- OpenAI.completion token (contentRequest usageQuery) <#> bindFlipped extractFirstChoice
+  eitherName <- OpenAI.completion token (qaRequest nameQuery) <#> bindFlipped (extractFirstChoice >>> map (\a -> extractSingleAnswer a # maybe a identity))
+  eitherVersion <- OpenAI.completion token (qaRequest versionQuery) <#> bindFlipped (extractFirstChoice >>> map (\a -> extractSingleAnswer a))
+  eitherLicense <- OpenAI.completion token (qaRequest licenseQuery) <#> bindFlipped (extractFirstChoice >>> map (\a -> extractSingleAnswer a))
+  log $ either show (\r -> "Received name:\n" <> show r) eitherName
+  log $ either show (\r -> "Received tldr:\n" <> show r) eitherTldr
+  log $ either show (\r -> "Received usage:\n" <> show r) eitherUsage
+  log $ either show (\r -> "Received version:\n" <> show r) eitherVersion
+  log $ either show (\r -> "Received license:\n" <> show r) eitherLicense
+  let
+    result = { name: _, tldr: _, usage: _, version: _, license: _ } <$> eitherName <*> eitherTldr <*> eitherUsage <*> eitherVersion <*> eitherLicense
+  log $ "Sending result:\n" <> show result
+  pure $ result
+
+separator :: String
+separator = "\n-----\n"
+
+openAISelection :: Token -> Selection
+openAISelection token req@{ files } = do
+  log $ "Got request" <> show req
+  let
+    tldrQuery = joinWith "\n" files <> separator <> "# What are the three most important files? List them with their full path.\n"
+
     completionRequest = OpenAI.fillCompletionRequest
-      { prompt: templatedQuery
+      { prompt: tldrQuery
       , max_tokens: 50
-      , stop: ["###"] :: Array String
+      , stop: [ separator ] :: Array String
       , temperature: 0.0
       , top_p: 1.0
       , frequency_penalty: 0.0
       , presence_penalty: 0.0
       }
-  log $ "Sending query:\n" <> templatedQuery
+  log $ "Sending query:\n" <> tldrQuery
   eitherCompletion <- OpenAI.completion token completionRequest
   log $ either show (\r -> "Received result:\n" <> show r) eitherCompletion
   let
-    clean = stripPrefix (Pattern "\nA: ") >>> map trim 
+    clean = trim
     dataError = error "Failed to extract data"
-    extract s = case split (Pattern "---") s of 
-      [classification, tldr] -> Right { classification: trim classification, tldr: trim tldr }
-      _ -> Left dataError
-    toClassification { choices } = case head choices of 
-      Just { text } -> text # clean # note dataError >>= extract
+    extract potentialPaths =
+      let
+        selectedFiles = filter (\file -> includes file potentialPaths) files
+      in
+        Right { files: selectedFiles }
+    toSelection { choices } = case head choices of
+      Just { text } -> text # clean # extract
       Nothing -> Left dataError
-  pure $ eitherCompletion >>= toClassification
+  pure $ eitherCompletion >>= toSelection
 
 mkHandlers :: Engine -> Effect Handlers
-mkHandlers (NLPCloud token) = NLPCloud.makeClient token <#> \client -> { classification: nlpCloudClassification client }
-mkHandlers (OpenAI token) = pure $ { classification: openAIClassification token }
-mkHandlers (Mock) = pure { classification: const (pure $ Right { classification: "mocktography", tldr: "tldr" }) }
+mkHandlers (NLPCloud token) = NLPCloud.makeClient token <#> \client -> { classification: nlpCloudClassification client, selectFiles: const (pure $ Right { files: [] }) }
+mkHandlers (OpenAI token) = pure $ { classification: openAIClassification token, selectFiles: openAISelection token }
+mkHandlers (Mock) = pure { classification, selectFiles }
+  where
+  classification request = do
+    logShow request
+    pure $ Right { name: "mocktography", tldr: "tldr", usage: "", version: Just "v0.3.0", license: Just "MIT" }
+
+  selectFiles request = do
+    logShow request
+    pure $ Right { files: request.files }

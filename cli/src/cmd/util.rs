@@ -15,7 +15,6 @@ pub async fn read_utf8_file(file_name: &path::Path) -> Result<String> {
 
 pub async fn write_utf8_file(file_name: String, content: String) -> Result<()> {
     let mut buffer = fs::File::create(file_name).await?;
-
     buffer.write_all(content.as_bytes()).await?;
 
     Ok(())

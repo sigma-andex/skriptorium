@@ -5,6 +5,7 @@ use base64::encode;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path;
 
 #[derive(Debug)]
 pub enum ClassificationError {
@@ -21,27 +22,47 @@ impl fmt::Display for ClassificationError {
     }
 }
 
+
+#[derive(Serialize, Deserialize, Debug)]
+struct ClassificationFile {
+    name: Option<String>,
+    content: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct ClassificationRequest {
-    snippet: String,
     language: Option<String>,
+    files: Vec<ClassificationFile>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Classification {
-    pub classification: String,
+    pub name: String,
     pub tldr: String,
+    pub usage: String,
+    pub version: Option<String>,
+    pub license: Option<String>,
 }
 
-fn mk_snippet(snippet: String) -> String {
-    format!("```\n{}\n```", snippet.trim())
+#[derive(Serialize, Deserialize, Debug)]
+struct SelectionRequest {
+    files: Vec<String>,
 }
 
-pub async fn classify(maybe_language: Option<String>, snippet: String) -> Result<Classification> {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Selection {
+    pub files: Vec<String>,
+}
+
+pub async fn classify(
+    maybe_language: Option<String>,
+    files: Vec<(Option<String>, String)>,
+) -> Result<Classification> {
     let client = reqwest::Client::new();
+    let encoded_files: Vec<ClassificationFile> = files.iter().map(|(name, content)| ClassificationFile { name:name.clone(), content: encode(content.trim()) }).collect();
     let request = ClassificationRequest {
         language: maybe_language,
-        snippet: encode(mk_snippet(snippet)),
+        files: encoded_files,
     };
     let request = serde_json::to_string(&request)?;
     info!("Sending request {}", request);
@@ -51,6 +72,21 @@ pub async fn classify(maybe_language: Option<String>, snippet: String) -> Result
         .send()
         .await?
         .json::<Classification>()
+        .await?;
+    Ok(response)
+}
+
+pub async fn select(files: Vec<String>) -> Result<Selection> {
+    let client = reqwest::Client::new();
+    let request = SelectionRequest { files: files };
+    let request = serde_json::to_string(&request)?;
+    info!("Sending request {}", request);
+    let response = client
+        .post("http://localhost:8080/api/v1/select-files")
+        .body(request)
+        .send()
+        .await?
+        .json::<Selection>()
         .await?;
     Ok(response)
 }

@@ -33,8 +33,6 @@ impl fmt::Display for ClassificationError {
 pub struct GuessLangSettings {
     bundle: tensorflow::SavedModelBundle,
     graph: tensorflow::Graph,
-    name_to_abbreviation: HashMap<String, String>,
-    abbreviation_to_name: HashMap<String, String>,
 }
 
 fn load_model(
@@ -67,7 +65,6 @@ fn load_model(
 
 pub struct ClassificationResult {
     pub identifier: String,
-    pub name: String,
     pub score: f32,
 }
 
@@ -75,12 +72,7 @@ pub fn classify(
     guess_lang_settings: &GuessLangSettings,
     snippet: String,
 ) -> std::result::Result<Vec<ClassificationResult>, Box<tensorflow::Status>> {
-    let GuessLangSettings {
-        bundle,
-        graph,
-        abbreviation_to_name,
-        name_to_abbreviation,
-    } = &guess_lang_settings;
+    let GuessLangSettings { bundle, graph } = &guess_lang_settings;
 
     let mut content = tensorflow::Tensor::new(&[1]);
     content[0] = snippet;
@@ -111,62 +103,24 @@ pub fn classify(
         .map(|(abbr, score)| (abbr.to_string(), score.clone()))
         .collect();
 
-    let sorted_results = sort_classifications(&results, &abbreviation_to_name);
+    let sorted_results = sort_classifications(&results);
 
     Ok(sorted_results)
 }
 
-fn sort_classifications(
-    classifications: &Vec<(String, f32)>,
-    abbreviation_to_name: &HashMap<String, String>,
-) -> Vec<ClassificationResult> {
+fn sort_classifications(classifications: &Vec<(String, f32)>) -> Vec<ClassificationResult> {
     let mut mapped: Vec<ClassificationResult> = classifications
         .iter()
-        .flat_map(|(abbr, score)| {
-            {
-                abbreviation_to_name
-                    .get(abbr)
-                    .iter()
-                    .map(|name| ClassificationResult {
-                        identifier: abbr.to_string(),
-                        name: name.to_string(),
-                        score: score.clone(),
-                    })
-            }
-            .collect::<Vec<ClassificationResult>>()
+        .map(|(identifier, score)| ClassificationResult {
+            identifier: identifier.to_string(),
+            score: score.clone(),
         })
         .collect();
     mapped.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
     mapped
 }
 
-fn swap<K: Eq + Hash + Clone, V: Eq + Hash + Clone>(hashmap: HashMap<K, V>) -> HashMap<V, K> {
-    let mut swapped: HashMap<V, K> = HashMap::new();
-    for (k, v) in hashmap.into_iter() {
-        swapped.insert(v, k);
-    }
-    swapped
-}
-async fn load_languages_config(
-    path: path::PathBuf,
-) -> types::Result<(HashMap<String, String>, HashMap<String, String>)> {
-    let mut languages_file = path;
-    languages_file.push("languages.json");
-    let json = fs::read_to_string(languages_file).await?;
-
-    let name_to_abbreviation: HashMap<String, String> = serde_json::from_str(json.as_str())?;
-    let abbreviation_to_name: HashMap<String, String> = swap(name_to_abbreviation.clone());
-    Ok((name_to_abbreviation, abbreviation_to_name))
-}
-
 pub async fn load_settings(path: path::PathBuf) -> types::Result<GuessLangSettings> {
-    let (name_to_abbreviation, abbreviation_to_name) =
-        load_languages_config(path.to_owned()).await?;
     let (bundle, graph) = load_model(path)?;
-    Ok(GuessLangSettings {
-        bundle,
-        graph,
-        name_to_abbreviation,
-        abbreviation_to_name,
-    })
+    Ok(GuessLangSettings { bundle, graph })
 }

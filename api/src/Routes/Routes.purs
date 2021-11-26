@@ -8,6 +8,7 @@ import Data.Array (drop)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Debug (spy)
 import Effect.Aff (Aff, Error)
 import Effect.Class.Console (log)
 import HTTPure ((!!))
@@ -41,7 +42,7 @@ defaultHandleRequest handle request = case parseAndDecode request.body :: ErrorO
         Left err -> do
             log $ "An internal error occured: " <> show err 
             HTTPure.internalServerError' jsonHeaders $ encodeAndStringify { error: "An internal server error occured. Please try again later" }
-        Right apiResponse -> HTTPure.ok' jsonHeaders $ encodeAndStringify apiResponse
+        Right apiResponse -> HTTPure.ok' jsonHeaders $ spy "sending json" $ encodeAndStringify apiResponse
   Left err -> do
     log $ "Got invalid request" <> show err 
     HTTPure.badRequest' jsonHeaders $ encodeAndStringify { error: "Unable to parse request format." }
@@ -52,6 +53,7 @@ defaultHandleRequest handle request = case parseAndDecode request.body :: ErrorO
 
 skriptioriumRoutes :: ApiTypes.Handlers -> HTTPure.Request -> HTTPure.ResponseM
 skriptioriumRoutes { classification } request@{ path: [ "classification" ], method: HTTPure.Post } = defaultHandleRequest classification request
+skriptioriumRoutes { selectFiles } request@{ path: [ "select-files" ], method: HTTPure.Post } = defaultHandleRequest selectFiles request
 skriptioriumRoutes _ _ = HTTPure.notFound
 
 routes :: ApiTypes.Handlers -> HTTPure.Request -> HTTPure.ResponseM

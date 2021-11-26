@@ -2,6 +2,7 @@ extern crate clap;
 
 use crate::api::classification;
 use crate::cmd::directory_listing;
+use crate::cmd::file_selection;
 use crate::cmd::language_detection;
 use crate::cmd::util;
 use crate::types::Result;
@@ -9,6 +10,7 @@ use console::style;
 use console::Emoji;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
+use rand::prelude::*;
 use std::fmt;
 use std::future;
 use std::path;
@@ -135,20 +137,19 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         failure,
     )
     .await?;
-    let snippet = util::read_utf8_file(path::Path::new("snippet.txt")).await?;
 
     let running = format!("{}", style("Running language detection...").dim().white());
 
     let success = |maybe_language: &Option<String>| match maybe_language {
-        Some(language) => format!(
-            "{} {} {}",
-            LANGUAGE,
-            style("Detected language:").dim().white(),
-            style(language_detection::language_display_name_or_default(
-                language
-            ))
-            .blue(),
-        ),
+        Some(language) => {
+            let display_name = language_detection::language_display_name_or_default(language);
+            format!(
+                "{} {} {}",
+                LANGUAGE,
+                style("Detected language:").dim().white(),
+                style(display_name).blue(),
+            )
+        }
         None => format!(
             "{} {}",
             LANGUAGE,
@@ -163,24 +164,48 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         )
     };
     let detected_language = create_task(
-        language_detection::language_detection(relevant_files),
+        language_detection::language_detection(relevant_files.clone()),
         running,
         success,
         failure,
     )
     .await?;
 
+    // let selected_files = file_selection::select_files(&detected_language, &relevant_files).await?;
+
+    // for file in selected_files.iter() {
+    //     println!("Selected file: {}", &file.as_path().display());
+    // }
+
     let running = format!("{}", style("Running classification...").dim().white());
 
     let success = |classification: &classification::Classification| {
+        let text = &classification.tldr;
+        let name = &classification.name;
+        let version = &classification.version;
+        let license = &classification.license;
+
+        let tldr = if text.len() > 30 {
+            let mut stripped = String::new();
+            stripped.push_str(&text[0..29]);
+            stripped.push_str("...");
+            stripped
+        } else {
+            text.clone()
+        };
+
         format!(
-            "{} {}\n      {} {}\n      {} {}",
+            "{} {}\n      {} {}\n      {} {}\n      {} {}\n      {} {}",
             CLASSIFIED,
             style("Classification successful:").dim().white(),
             style("- name").dim().white(),
-            style(classification.classification.to_string()).blue(),
+            style(name.to_string()).blue(),
             style("- tldr").dim().white(),
-            style(classification.tldr.to_string()).blue(),
+            style(tldr.to_string()).blue(),
+            style("- version").dim().white(),
+            style(version.as_ref().map(|v|v.to_string()).unwrap_or("".to_string())).blue(),
+            style("- license").dim().white(),
+            style(license.as_ref().map(|l|l.to_string()).unwrap_or("".to_string())).blue(),
         )
     };
     let failure = |e: &Box<dyn std::error::Error + Send + Sync>| {
@@ -190,15 +215,22 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
             style("Unable to classify code 😭").dim().white()
         )
     };
+
+    // [TODO] Figure out where to best put this.
+    let mut rng = rand::thread_rng();
+    let mut shuffled_files: Vec<path::PathBuf> = relevant_files.clone();
+    shuffled_files.shuffle(&mut rng);
+
     let result: classification::Classification = create_task(
-        classification::classify(detected_language, snippet.clone()),
+        file_selection::classify(detected_language, shuffled_files),
         running,
         success,
         failure,
     )
     .await?;
-
-    let markdown = format!("# {}\n\n{}", result.classification, result.tldr);
+    let license_badge = result.license.as_ref().map(|license| format!("![{}](https://img.shields.io/badge/license-{}-blue)", license, license)).unwrap_or("".to_string());
+    let version_badge = result.version.as_ref().map(|version| format!("![{}](https://img.shields.io/badge/version-{}-red)", version, version)).unwrap_or("".to_string());
+    let markdown = format!("{} {}\n# {}\n\n{}\n\n## Usage\n\n{}", version_badge, license_badge, result.name, result.tldr, result.usage);
     util::write_utf8_file("docs/README.md".to_owned(), markdown).await?;
     Ok(())
 }
