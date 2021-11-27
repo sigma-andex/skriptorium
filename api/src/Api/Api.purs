@@ -9,7 +9,7 @@ import Control.Bind (bindFlipped)
 import Data.Array (filter, foldl, head)
 import Data.Either (Either(..), either, note)
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (Pattern(..), split, trim)
+import Data.String (Pattern(..), split, take, trim)
 import Data.String.Base64 as B64
 import Data.String.Common (joinWith)
 import Data.String.Utils (includes)
@@ -39,14 +39,16 @@ extractFirstChoice { choices } = head choices <#> (_.text >>> trim) # note (erro
 extractSingleAnswer :: String -> Maybe String
 extractSingleAnswer s = split (Pattern ("Q:")) s # head <#> trim
 
+langToName lang = case lang of
+  Just "rs" -> "Rust "
+  Just "hs" -> "Purescript "
+  _ -> ""
+
 openAIClassification :: Token -> Classification
 openAIClassification token req@{ language, files } = do
   log $ "Got request" <> show req
   b64Decoded <- either (const $ throwError $ error "#Not valid base64") pure $ traverse (\{ name, content } -> B64.atob content <#> \decoded -> { name, decoded }) files
   let
-    langToName lang = case language of
-      Just "rs" -> "Rust "
-      _ -> ""
 
     contentPrefix lang = "The following code snippets are from a " <> langToName lang <> "project.\n"
 
@@ -56,14 +58,14 @@ openAIClassification token req@{ language, files } = do
     header Nothing = "--- ---\n"
     concatenate acc { name, decoded } = acc <> (header name) <> decoded <> "\n\n"
 
-    concatenated = foldl concatenate "" b64Decoded
+    concatenatedAndLimited = foldl concatenate "" b64Decoded # take 4000
 
     metaQuestion = "\nQ: What is the name, version and license of this project as a comma-separated list?\nA:"
     tldrQuestion = "\nWhat is this project about?\n"
     usageQuestion = "\nHow can I use this project?\n"
 
-    mkContentQuery question = contentPrefix language <> concatenated <> separator <> question
-    mkQaQuery question = qaPrefix language <> concatenated <> separator <> question
+    mkContentQuery question = contentPrefix language <> concatenatedAndLimited <> separator <> question
+    mkQaQuery question = qaPrefix language <> concatenatedAndLimited <> separator <> question
 
     tldrQuery = mkContentQuery tldrQuestion
     usageQuery = mkContentQuery usageQuestion
@@ -101,20 +103,20 @@ openAIClassification token req@{ language, files } = do
     toMetadata a = extractSingleAnswer a >>= extractMetadata # maybe { name: "", version: Nothing, license: Nothing } identity
 
   log $ "Sending query:\n" <> tldrQuery
-  eitherTldr <- OpenAI.completion token (contentRequest tldrQuery) <#> bindFlipped extractFirstChoice
-  --eitherUsage <- OpenAI.completion token (contentRequest usageQuery) <#> bindFlipped extractFirstChoice
-  eitherMetadata <- OpenAI.completion token (qaRequest metaQuery) <#> bindFlipped (extractFirstChoice >>> map toMetadata)
+  eitherTldr <- OpenAI.completion token "davinci-codex" (contentRequest tldrQuery) <#> bindFlipped extractFirstChoice
+  eitherUsage <- OpenAI.completion token "davinci-codex" (contentRequest usageQuery) <#> bindFlipped extractFirstChoice
+  eitherMetadata <- OpenAI.completion token "davinci-codex" (qaRequest metaQuery) <#> bindFlipped (extractFirstChoice >>> map toMetadata)
   
   log $ either show (\r -> "Received name:\n" <> show r) eitherMetadata
   log $ either show (\r -> "Received tldr:\n" <> show r) eitherTldr
-  --log $ either show (\r -> "Received usage:\n" <> show r) eitherUsage
+  log $ either show (\r -> "Received usage:\n" <> show r) eitherUsage
   
   let
     result = do
       { name, version, license } <- eitherMetadata
       tldr <- eitherTldr
-      --usage <- eitherUsage
-      pure { name, tldr, usage: "", version, license }
+      usage <- eitherUsage
+      pure { name, tldr, usage, version, license }
   log $ "Sending result:\n" <> show result
   pure $ result
 
@@ -122,10 +124,11 @@ separator :: String
 separator = "\n-----\n"
 
 openAISelection :: Token -> Selection
-openAISelection token req@{ files } = do
+openAISelection token req@{ language, files } = do
   log $ "Got request" <> show req
   let
-    tldrQuery = joinWith "\n" files <> separator <> "# What are the three most important files? List them with their full path.\n"
+    prefix = "The following is a list of files from a " <> langToName language <> " project."
+    tldrQuery = prefix <> joinWith "\n" files <> separator <> "List the five most important files with their full path.\n"
 
     completionRequest = OpenAI.fillCompletionRequest
       { prompt: tldrQuery
@@ -137,7 +140,7 @@ openAISelection token req@{ files } = do
       , presence_penalty: 0.0
       }
   log $ "Sending query:\n" <> tldrQuery
-  eitherCompletion <- OpenAI.completion token completionRequest
+  eitherCompletion <- OpenAI.completion token "davinci-codex" completionRequest
   log $ either show (\r -> "Received result:\n" <> show r) eitherCompletion
   let
     clean = trim

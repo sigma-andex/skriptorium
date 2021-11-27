@@ -18,7 +18,7 @@ pub async fn select_files(
         .map(|s| s.to_string())
         .collect();
 
-    let selected_files = classification::select(file_selection).await?;
+    let selected_files = classification::select(detected_language.clone(), file_selection).await?;
     if !selected_files.files.is_empty() {
         let selected_paths: Vec<path::PathBuf> = selected_files
             .files

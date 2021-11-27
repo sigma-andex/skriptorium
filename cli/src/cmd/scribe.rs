@@ -180,28 +180,22 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
     let running = format!("{}", style("Running classification...").dim().white());
 
     let success = |classification: &classification::Classification| {
-        let text = &classification.tldr;
+        let tldr = &classification.tldr;
+        let usage = &classification.usage;
         let name = &classification.name;
         let version = &classification.version;
         let license = &classification.license;
 
-        let tldr = if text.len() > 30 {
-            let mut stripped = String::new();
-            stripped.push_str(&text[0..29]);
-            stripped.push_str("...");
-            stripped
-        } else {
-            text.clone()
-        };
-
         format!(
-            "{} {}\n      {} {}\n      {} {}\n      {} {}\n      {} {}",
+            "{} {}\n      {} {}\n      {} {}\n      {} {}\n      {} {}\n      {} {}",
             CLASSIFIED,
             style("Classification successful:").dim().white(),
             style("- name").dim().white(),
             style(name.to_string()).blue(),
             style("- tldr").dim().white(),
-            style(tldr.to_string()).blue(),
+            style(util::limit_string(tldr, 30).to_string()).blue(),
+            style("- usage").dim().white(),
+            style(util::limit_string(usage, 30).to_string()).blue(),
             style("- version").dim().white(),
             style(
                 version
@@ -261,9 +255,8 @@ pub async fn scribe<'a>(matches: &clap::ArgMatches<'a>) -> Result<()> {
         })
         .unwrap_or("".to_string());
     let markdown = format!(
-        //"{} {}\n# {}\n\n{}\n\n## Usage\n\n{}",
-        "{} {}\n# {}\n\n{}\n\n",
-        version_badge, license_badge, result.name, result.tldr //, result.usage
+        "{} {}\n# {}\n\n{}\n\n## Usage\n\n{}",
+        version_badge, license_badge, result.name, result.tldr, result.usage
     );
     util::write_utf8_file("docs/README.md".to_owned(), markdown).await?;
     Ok(())

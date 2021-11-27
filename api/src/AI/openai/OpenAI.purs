@@ -67,15 +67,15 @@ fillCompletionRequest
   -> CompletionRequestProps Maybe
 fillCompletionRequest = justifill
 
-completion :: Token -> CompletionRequestProps Maybe -> Aff (Either Error (CompletionResponseProps Maybe))
-completion (Token token) request = do
+completion :: Token -> String -> CompletionRequestProps Maybe -> Aff (Either Error (CompletionResponseProps Maybe))
+completion (Token token) model request = do
   let
     opts =
       { method: M.postMethod
       , body: stringify $ encodeJson request
       , headers: M.makeHeaders { "Content-Type": "application/json", "Authorization": "Bearer " <> token }
       }
-  eitherResponse <- attempt $ fetch (M.URL "https://api.openai.com/v1/engines/davinci-codex/completions") opts
+  eitherResponse <- attempt $ fetch (M.URL $ "https://api.openai.com/v1/engines/" <> model <> "/completions") opts
   case eitherResponse of
     Right response | M.statusCode response >= 200 && M.statusCode response < 400 -> do
       body <- M.text response

@@ -45,6 +45,7 @@ pub struct Classification {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SelectionRequest {
+    language: Option<String>,
     files: Vec<String>,
 }
 
@@ -81,9 +82,9 @@ pub async fn classify(
     Ok(response)
 }
 
-pub async fn select(files: Vec<String>) -> Result<Selection> {
+pub async fn select(maybe_language: Option<String>, files: Vec<String>) -> Result<Selection> {
     let client = reqwest::Client::new();
-    let request = SelectionRequest { files: files };
+    let request = SelectionRequest { language: maybe_language, files: files };
     let request = serde_json::to_string(&request)?;
     info!("Sending request {}", request);
     let response = client

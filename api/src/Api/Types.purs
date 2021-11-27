@@ -35,6 +35,7 @@ type Classification = ClassificationRequest -> Aff (Either Error ClassificationR
 
 type SelectionRequest =
   { files :: Array String
+  , language :: Maybe String
   }
 
 type SelectionResponse =
