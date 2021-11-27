@@ -77,7 +77,7 @@ openAIClassification token req@{ language, files } = do
       , top_p: 1.0
       , n: 1
       , frequency_penalty: 0.0
-      , presence_penalty: 0.7
+      , presence_penalty: 0.6
       }
 
     qaRequest query = OpenAI.fillCompletionRequest
