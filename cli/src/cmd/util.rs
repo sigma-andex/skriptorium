@@ -20,9 +20,9 @@ pub async fn write_utf8_file(file_name: String, content: String) -> Result<()> {
     Ok(())
 }
 
-pub fn limit_string(text : &str, length: usize) -> String {
-    if(text.len() > length) {
-        let text_trimmed : String = text.chars().take(length).collect();
+pub fn limit_string(text: &str, length: usize) -> String {
+    if (text.len() > length) {
+        let text_trimmed: String = text.chars().take(length).collect();
         let mut trimmed = String::new();
         trimmed.push_str(text_trimmed.as_str());
         trimmed.push_str("...");

@@ -14,8 +14,17 @@ use tokio;
 
 use types::Result;
 
+use human_panic::setup_panic;
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    setup_panic!(Metadata {
+        name: env!("CARGO_PKG_NAME").into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        authors: "sigma-andex".into(),
+        homepage: "https://github.com/sigma-andex/skriptorium".into(),
+    });
+
     let matches = App::new(format!("{}", style("skriptorium").bold()))
         .version(crate_version!())
         .about("\n...your little helper to write the boring documentation for you!\nSkriptorium analyses your code repo to generate documentation automatically using deep learning (Guesslang, OpenAI and NLPCloud).")

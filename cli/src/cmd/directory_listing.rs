@@ -45,7 +45,6 @@ fn is_excluded_extension(entry: &walkdir::DirEntry) -> bool {
         .unwrap_or(false)
 }
 
-
 fn is_excluded_file(entry: &walkdir::DirEntry) -> bool {
     let excluded_files: Vec<&str> = vec!["package-lock.json"];
     entry
@@ -74,10 +73,13 @@ pub fn list_directories() -> types::Result<Vec<path::PathBuf>> {
 
     let cur_dir = env::current_dir().unwrap();
 
-    let results: Vec<path::PathBuf> = walkdir::WalkDir::new(".").max_depth(3) 
+    let results: Vec<path::PathBuf> = walkdir::WalkDir::new(".")
+        .max_depth(3)
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| !is_hidden(e) && !is_excluded_extension(e) && !is_directory(e) && !is_excluded_file(e))
+        .filter(|e| {
+            !is_hidden(e) && !is_excluded_extension(e) && !is_directory(e) && !is_excluded_file(e)
+        })
         .filter_map(|entry| {
             let entry_path = path::PathBuf::from(entry.path());
             let entry_path2 = entry_path.clone();
